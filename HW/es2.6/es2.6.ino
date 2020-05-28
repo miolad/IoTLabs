@@ -9,19 +9,13 @@
 
 #define PERIOD_LENGTH_SENSORS   2500 // ms - period of sensor-polling main loop
 
-#define SOUND_EVENTS_MIN        50   // 50 events in timeoutSound to register a person
-#define SOUND_EVENTS_LEN_MIN    50   // ms - the minimum length of time that must pass between two valid sound events
+#define SOUND_EVENTS_MIN        10   // 50 events in timeoutSound to register a person
+#define SOUND_EVENTS_LEN_MIN    500  // ms - the minimum length of time that must pass between two valid sound events
 
 #define B 4275                                      // K
 #define ANALOG_REFERENCE 1023.f                     // V
 #define ONE_OVER_T0 1.f / (25.0 + 273.15)           // K
 #define CELSIUS_OFFSET 273.15                       // K
-
-#define TEMPERATURE_SET_POINT_FAN_MIN 25.f          // Celsius
-#define TEMPERATURE_SET_POINT_FAN_MAX 27.f          // Celsius
-
-#define TEMPERATURE_SET_POINT_HT_MIN 24.f           // Celsius
-#define TEMPERATURE_SET_POINT_HT_MAX 26.f           // Celsius
 
 // -------------- VARIABLES --------------
 int analogValue;
@@ -46,6 +40,17 @@ volatile bool soundEventHappened = false;
 
 // Used to time the main loop without using delay()
 unsigned long timeOfLastLoopSensors = 0;
+
+// -------------- Default temperature set points --------------
+float setPointACPersonMin =          25.f;     // Celsius
+float setPointACPersonMax =          27.f;     // Celsius
+float setPointACNoPersonMin =        23.f;     // Celsius
+float setPointACNoPersonMax =        25.f;     // Celsius
+
+float setPointHTPersonMin =           23.f;     // Celsius
+float setPointHTPersonMax =           27.f;     // Celsius
+float setPointHTNoPersonMin =         21.f;     // Celsius
+float setPointHTNoPersonMax =         25.f;     // Celsius
 
 void noiseSensorISR()
 {
@@ -124,18 +129,7 @@ void loop()
         // Get the temperature in Celsius
         T = 1.f / ((log(RoverR0) / B) + ONE_OVER_T0) - CELSIUS_OFFSET;
 
-        // Calculate the percent
-        float tempPercentAC = constrain((T - TEMPERATURE_SET_POINT_FAN_MIN) / (TEMPERATURE_SET_POINT_FAN_MAX - TEMPERATURE_SET_POINT_FAN_MIN), 0.f, 1.f);
-        float tempPercentHT = constrain((T - TEMPERATURE_SET_POINT_HT_MIN) / (TEMPERATURE_SET_POINT_HT_MAX - TEMPERATURE_SET_POINT_HT_MIN), 0.f, 1.f);
-
-        // Set the corresponding PWM output for the fan module
-        analogWrite(FAN_MODULE_PWM_PIN, 255 * tempPercentAC);
-
-        // Set the 'heater' intensity according to ambient temperature
-        analogWrite(HEATER_LED_PWM_PIN, 255 * tempPercentHT);
-
         // If enough time has passed since the last sound event, the person that (maybe) was in the room probably went away
-
         if (now >= soundEventsBuffer.getFromTop() + timeoutSound)
             personSound = false;
 
@@ -156,6 +150,22 @@ void loop()
 
         // At this point, we can just OR the two contributes
         person = personPir | personSound;
+
+        // Get the proper setpoints
+        float setPointACMin = person ? setPointACPersonMin : setPointACNoPersonMin;
+        float setPointACMax = person ? setPointACPersonMax : setPointACNoPersonMax;
+        float setPointHTMin = person ? setPointHTPersonMin : setPointHTNoPersonMin;
+        float setPointHTMax = person ? setPointHTPersonMax : setPointHTNoPersonMax;
+
+        // Calculate the percent
+        float tempPercentAC = constrain((T - setPointACMin) / (setPointACMax - setPointACMin), 0.f, 1.f);
+        float tempPercentHT = constrain((T - setPointHTMin) / (setPointHTMax - setPointHTMin), 0.f, 1.f);
+
+        // Set the corresponding PWM output for the fan module
+        analogWrite(FAN_MODULE_PWM_PIN, 255 * tempPercentAC);
+
+        // Set the 'heater' intensity according to ambient temperature
+        analogWrite(HEATER_LED_PWM_PIN, 255 * tempPercentHT);
         
         Serial.print("TEMPERATURE: ");
         Serial.print(T);
@@ -163,7 +173,13 @@ void loop()
         Serial.print(tempPercentAC);
         Serial.print(", ");
         Serial.print(tempPercentHT);
-        Serial.print(", person: ");
-        Serial.println(person ? "true" : "false");
+        Serial.print(", personPir: ");
+        Serial.print(personPir ? "true" : "false");
+        Serial.print(", personSound: ");
+        Serial.print(personSound ? "true" : "false");
+        Serial.print(", setPointACMin = ");
+        Serial.print(setPointACMin);
+        Serial.print(", setPointACMax = ");
+        Serial.println(setPointACMax);
     }
 }

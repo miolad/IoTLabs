@@ -135,12 +135,8 @@ void loop()
         analogWrite(HEATER_LED_PWM_PIN, 255 * tempPercentHT);
 
         // If enough time has passed since the last sound event, the person that (maybe) was in the room probably went away
-        // (I have to disable interrupts because soundEventsBuffer.getFromTop() is 4 bytes, which is more than 1 byte, so the CPU could be interrupted mid-read)
-        noInterrupts();
-        unsigned long lastSoundEventMillis = soundEventsBuffer.getFromTop();
-        interrupts();
 
-        if (millis() - lastSoundEventMillis >= timeoutSound)
+        if (now >= soundEventsBuffer.getFromTop() + timeoutSound)
             personSound = false;
 
         // Read the PIR motion sensor
@@ -150,9 +146,9 @@ void loop()
             personPir = true;
 
             // Reset the time since last person
-            millisSinceLastPerson = millis();        
+            millisSinceLastPerson = now;        
         }
-        else if (millis() - millisSinceLastPerson >= timeoutPir)
+        else if (now - millisSinceLastPerson >= timeoutPir)
         {
             // The timeout has passed, the person is probably not here anymore
             personPir = false;

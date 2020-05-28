@@ -1,5 +1,5 @@
 // Initializes static content on the display based on the current mode
-void initStaticContentLCD()
+void printStaticContentLCD()
 {
     switch (lcdStatus)
     {
@@ -74,5 +74,5 @@ void initLCD()
     lcd.clear();
 
     // Initialize static content for the first screen
-    initStaticContentLCD();
+    printStaticContentLCD();
 }

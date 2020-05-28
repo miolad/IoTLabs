@@ -118,5 +118,5 @@ void parseCommand()
     skipToSpace(&cmdp);
     *spMax = atof(cmdp);
 
-    Serial.println("SUCCESS: Set Points updated successfully!");
+    Serial.println("SUCCESS: Set points updated successfully!");
 }

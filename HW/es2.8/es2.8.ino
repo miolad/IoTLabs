@@ -138,7 +138,7 @@ void loop()
         lcdStatus = !lcdStatus;
 
         // Print static content for this mode
-        initStaticContentLCD();
+        printStaticContentLCD();
     }
     
     if (now >= timeOfLastLoopSensors + PERIOD_LENGTH_SENSORS || forceSensorLoop)

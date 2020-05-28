@@ -1,5 +1,6 @@
 // #include <IntegerArrayDeque.hpp>
 #include <LiquidCrystal_PCF8574.h>
+#include <ctype.h>
 
 // -------------- CONSTANTS --------------
 #define TEMPERATURE_SENSOR_PIN  A0
@@ -22,11 +23,14 @@
 
 #define LCD_SWITCH_PERIOD 5000 // ms
 
+#define COMMAND_MAX_LENGTH 32
+
 // -------------- VARIABLES --------------
 int analogValue;
 float RoverR0, T;
 
 bool person = false; // Global best guess at 'is there a person in the room?'
+bool forceSensorLoop = true; // Set this when you want to run the main sensors loop without waiting
 
 const long timeoutPir = 1800000;                     // 30 minutes in ms
 unsigned int millisSinceLastPerson = 0;
@@ -59,27 +63,13 @@ float setPointHTPersonMax =           27.f;     // Celsius
 float setPointHTNoPersonMin =         21.f;     // Celsius
 float setPointHTNoPersonMax =         25.f;     // Celsius
 
-void initStaticContentLCD()
-{
-    switch (lcdStatus)
-    {
-    case 0:
-        lcd.setCursor(0, 0);
-        lcd.print("T: 00.0, Pres:0 ");
-        lcd.setCursor(0, 1);
-        lcd.print("AC:000%, HT:000%");
-        break;
+// Command buffer
+char cmd[COMMAND_MAX_LENGTH];
+byte cmdBufferIndex = 0;
 
-    case 1:
-        lcd.setCursor(0, 0);
-        lcd.print("AC m:     M:    ");
-        lcd.setCursor(0, 1);
-        lcd.print("HT m:     M:    ");
-    }
-
-    // Trigger an update of dynamic content
-    timeOfLastLoopSensors = 0;
-}
+// These 'libs' need to see global variables, so they must be included down here
+#include <CommandParserUtils.hpp>
+#include <DisplayUtils.hpp>
 
 void noiseSensorISR()
 {
@@ -109,19 +99,15 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(NOISE_SENSOR_PIN), noiseSensorISR, FALLING);
 
     // Setup the lcd display
-    lcd.begin(16, 2);
-    lcd.setBacklight(255);
-    lcd.home();
-    lcd.clear();
-
-    // Initialize static content for the first screen
-    lcd.print("T: 00.0, Pres:0");
-    lcd.setCursor(0, 1);
-    lcd.print("AC:000%, HT:000%");
+    initLCD();
 }
 
 void loop()
 {
+    // Read commands on serial
+    if (readCommand())
+        parseCommand();
+    
     unsigned long now = millis();
 
     // Shouldn't need special care for overflow edge cases
@@ -151,8 +137,6 @@ void loop()
         }
 
         timeOfLastSoundEvent = now;
-
-        Serial.println("Sound event happened!");
     }
 
     // Reset the flag anyway
@@ -166,7 +150,7 @@ void loop()
         lcdStatus = !lcdStatus;
 
         // Print static content for this mode
-        initStaticContentLCD();
+        printStaticContentLCD();
     }
     
     if (now >= timeOfLastLoopSensors + PERIOD_LENGTH_SENSORS)
@@ -212,7 +196,7 @@ void loop()
         float setPointHTMin = person ? setPointHTPersonMin : setPointHTNoPersonMin;
         float setPointHTMax = person ? setPointHTPersonMax : setPointHTNoPersonMax;
 
-        // Calculate the percent
+        // Calculate the percentages
         float tempPercentAC = constrain((T - setPointACMin) / (setPointACMax - setPointACMin), 0.f, 1.f);
         float tempPercentHT = constrain((T - setPointHTMin) / (setPointHTMax - setPointHTMin), 0.f, 1.f);
 
@@ -222,44 +206,8 @@ void loop()
         // Set the 'heater' intensity according to ambient temperature
         analogWrite(HEATER_LED_PWM_PIN, 255 * tempPercentHT);
         
-        if (lcdStatus)
-        {
-            // Update AC
-            lcd.setCursor(5, 0);
-            lcd.print(setPointACMin);
-            lcd.setCursor(12, 0);
-            lcd.print(setPointACMax);
-
-            // Update HT
-            lcd.setCursor(5, 1);
-            lcd.print(setPointHTMin);
-            lcd.setCursor(12, 1);
-            lcd.print(setPointHTMax);
-        }
-        else
-        {
-            char buf[5];
-            
-            // Update temperature
-            sprintf(buf, "%.1f", T);
-            lcd.setCursor(3, 0);
-            lcd.print(T);
-
-            // Update presence
-            lcd.setCursor(14, 0);
-            lcd.print(person);
-
-            // Update AC
-            sprintf(buf, "%03d", (int)(100 * tempPercentAC));
-            lcd.setCursor(3, 1);
-            lcd.print(buf);
-
-            // Update HT
-            sprintf(buf, "%03d", (int)(100 * tempPercentHT));
-            lcd.setCursor(12, 1);
-            lcd.print(buf);
-        }
-
-        Serial.println("");
+        // Update the lcd's dynamic data
+        updateDynamicContentLCD(setPointACMin, setPointACMax, setPointHTMin, setPointHTMax, T, person,
+            (byte)(tempPercentAC * 100), (byte)(tempPercentHT * 100));
     }
 }

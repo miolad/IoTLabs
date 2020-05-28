@@ -65,105 +65,9 @@ float setPointHTNoPersonMax =         25.f;    // Celsius
 char cmd[COMMAND_MAX_LENGTH];
 byte cmdBufferIndex = 0;
 
-void initStaticContentLCD()
-{
-    switch (lcdStatus)
-    {
-    case 0:
-        lcd.setCursor(0, 0);
-        lcd.print("T: 00.0, Pres:0 ");
-        lcd.setCursor(0, 1);
-        lcd.print("AC:000%, HT:000%");
-        break;
-
-    case 1:
-        lcd.setCursor(0, 0);
-        lcd.print("AC m:     M:    ");
-        lcd.setCursor(0, 1);
-        lcd.print("HT m:     M:    ");
-    }
-
-    // Trigger an update of dynamic content
-    forceSensorLoop = true;
-}
-
-// Trims white spaces from the beginning of *str;
-void trimSpaces(char** str)
-{
-    unsigned int i;
-    for (i = 0; isspace((*str)[i]); ++i);
-    
-    *str += i;
-}
-
-// Format: usp <set-point> <min> <max>
-// where: <set-point> must be one of:
-//      - 'ac[p]': ac set-point with or without a person;
-//      - 'ht[p]': heater set-point with or without a person
-// and <min>/<max> must be valid floating point temperatures in Celsius
-//
-// Note: before calling this function, make sure that cmd is null-terminated
-void parseCommand()
-{  
-    // Command buffer as variable pointer
-    char* cmdp = cmd;
-    float* spMin, * spMax;
-
-    // Trim white spaces from the front of cmdp
-    trimSpaces(&cmdp);
-
-    // Is the command valid?
-    if (strncmp(cmdp, "usp ", 4))
-    {
-        // The command is not supported!
-        Serial.println("ERROR: Command not found!");
-        return;
-    }
-
-    cmdp += 4;
-    trimSpaces(&cmdp);
-
-    if (!strncmp(cmdp, "ac ", 3))
-    {
-        spMin = &setPointACNoPersonMin;
-        spMax = &setPointACNoPersonMax;
-
-        cmdp += 3;
-    }
-    else if (!strncmp(cmdp, "acp ", 4))
-    {
-        spMin = &setPointACPersonMin;
-        spMax = &setPointACPersonMax;
-
-        cmdp += 4;
-    }
-    else if (!strncmp(cmdp, "ht ", 3))
-    {
-        spMin = &setPointHTNoPersonMin;
-        spMax = &setPointHTNoPersonMax;
-
-        cmdp += 3;
-    }
-    else if (!strncmp(cmdp, "htp ", 4))
-    {
-        spMin = &setPointHTPersonMin;
-        spMax = &setPointHTPersonMax;
-
-        cmdp += 4;
-    }
-    else
-    {
-        // The command is invalid
-        Serial.println("ERROR: Command not supported!");
-        return;
-    }
-    
-    // Finally, update the setpoints (atof automatically skips spaces)
-    *spMin = atof(cmdp);
-    *spMax = atof(cmdp);
-
-    Serial.println("SUCCESS: Set Points updated successfully!");
-}
+// These 'libs' need to see global variables, so they must be included down here
+#include <CommandParserUtils.hpp>
+#include <DisplayUtils.hpp>
 
 void noiseSensorISR()
 {
@@ -192,44 +96,14 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(NOISE_SENSOR_PIN), noiseSensorISR, FALLING);
 
     // Setup the lcd display
-    lcd.begin(16, 2);
-    lcd.setBacklight(255);
-    lcd.home();
-    lcd.clear();
-
-    // Initialize static content for the first screen
-    initStaticContentLCD();
+    initLCD();
 }
 
 void loop()
 {
-    // Read all the bytes from serial
-    while (Serial.available() && cmdBufferIndex < COMMAND_MAX_LENGTH)
-    {
-        cmd[cmdBufferIndex++] = Serial.read();
-
-        if (cmd[cmdBufferIndex] == '\n')
-            break;
-    }
-
-    // Check if the command is complete
-    if (cmd[cmdBufferIndex - 1] == '\n')
-    {
-        // We have a new command
-        // Substitute the trailing '\n' with a '\0'
-        cmd[cmdBufferIndex - 1] = '\0';
-
-        // Then parse and execute the command
+    // Read commands on serial
+    if (readCommand())
         parseCommand();
-
-        // Reset the command buffer
-        cmdBufferIndex = 0;
-    }
-    else if (cmdBufferIndex >= COMMAND_MAX_LENGTH)
-    {
-        // The command buffer is full -> empty it (the command will probably be wrong anyway)
-        cmdBufferIndex = 0;
-    }
     
     unsigned long now = millis();
 
@@ -251,10 +125,6 @@ void loop()
         // -> there is probably a person in the room
         if (soundEventsBuffer.isFull())
             personSound = true;
-
-        // DEBUG: print number of events in buffer to serial
-        Serial.print("noiseSensorISR: ");
-        Serial.println(soundEventsBuffer.count());
     }
 
     // Reset the flag anyway
@@ -313,7 +183,7 @@ void loop()
         float setPointHTMin = person ? setPointHTPersonMin : setPointHTNoPersonMin;
         float setPointHTMax = person ? setPointHTPersonMax : setPointHTNoPersonMax;
 
-        // Calculate the percent
+        // Calculate the percentages
         float tempPercentAC = constrain((T - setPointACMin) / (setPointACMax - setPointACMin), 0.f, 1.f);
         float tempPercentHT = constrain((T - setPointHTMin) / (setPointHTMax - setPointHTMin), 0.f, 1.f);
 
@@ -324,48 +194,7 @@ void loop()
         analogWrite(HEATER_LED_PWM_PIN, 255 * tempPercentHT);
         
         // Update the lcd's dynamic data
-        if (lcdStatus)
-        {
-            // Update AC
-            lcd.setCursor(5, 0);
-            lcd.print(setPointACMin, 1);
-            lcd.setCursor(12, 0);
-            lcd.print(setPointACMax, 1);
-
-            // Update HT
-            lcd.setCursor(5, 1);
-            lcd.print(setPointHTMin, 1);
-            lcd.setCursor(12, 1);
-            lcd.print(setPointHTMax, 1);
-        }
-        else
-        {
-            // Update temperature
-            lcd.setCursor(3, 0);
-            lcd.print(T, 1);
-
-            // Update presence
-            lcd.setCursor(14, 0);
-            lcd.print(person);
-
-            // Temporary variable to hold the integer percents
-            // The reason I'm doing all of this is because I want leading zeros on my percentaces, but I don't want
-            // to waste 5% of the available space for programs on the arduino to sprintf
-            byte tmp;
-
-            // Update AC
-            tmp = 100 * tempPercentAC;
-            lcd.setCursor(3, 1);
-            lcd.print(tmp == 100);
-            lcd.print((tmp = tmp % 100) > 9 ? (tmp / 10) : 0);
-            lcd.print(tmp % 10);
-
-            // Update HT
-            tmp = 100 * tempPercentHT;
-            lcd.setCursor(12, 1);
-            lcd.print(tmp == 100);
-            lcd.print((tmp = tmp % 100) > 9 ? (tmp / 10) : 0);
-            lcd.print(tmp % 10);
-        }
+        updateDynamicContentLCD(setPointACMin, setPointACMax, setPointHTMin, setPointHTMax, T, person,
+            (byte)(tempPercentAC * 100), (byte)(tempPercentHT * 100));
     }
 }

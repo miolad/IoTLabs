@@ -1,4 +1,4 @@
-#include <IntegerArrayDeque.hpp>
+// #include <IntegerArrayDeque.hpp>
 #include <LiquidCrystal_PCF8574.h>
 
 // -------------- CONSTANTS --------------
@@ -7,11 +7,13 @@
 #define HEATER_LED_PWM_PIN      6
 #define PIR_SENSOR_PIN          13
 #define NOISE_SENSOR_PIN        7
+#define GREEN_LED_PIN           11
 
 #define PERIOD_LENGTH_SENSORS   2500 // ms - period of sensor-polling main loop
 
-#define SOUND_EVENTS_MIN        10   // 50 events in timeoutSound to register a person
-#define SOUND_EVENTS_LEN_MIN    500  // ms - the minimum length of time that must pass between two valid sound events
+// #define SOUND_EVENTS_MIN        10   // 50 events in timeoutSound to register a person
+#define SOUND_EVENTS_LEN_MIN    150  // ms - the minimum length of time that must pass between two valid sound events
+#define SOUND_EVENTS_LEN_MAX    500  // ms
 
 #define B 4275                                      // K
 #define ANALOG_REFERENCE 1023.f                     // V
@@ -28,16 +30,16 @@ bool person = false; // Global best guess at 'is there a person in the room?'
 
 const long timeoutPir = 1800000;                     // 30 minutes in ms
 unsigned int millisSinceLastPerson = 0;
-bool personPir = false;
+// bool personPir = false;
 
-// TODO: change me
-const unsigned long soundInterval = 15 * 1000;              // ms
-const unsigned long timeoutSound = 10 * 1000;               // ms
+// const unsigned long soundInterval = 15 * 1000;              // ms
+// const unsigned long timeoutSound = 10 * 1000;               // ms
 
-// TODO: please optimize me
-IntegerArrayDeque soundEventsBuffer(SOUND_EVENTS_MIN);
-bool personSound = false;
+// IntegerArrayDeque soundEventsBuffer(SOUND_EVENTS_MIN);
+// bool personSound = false;
 volatile bool soundEventHappened = false;
+unsigned long timeOfLastSoundEvent = 0;
+bool greenLedStatus = false; // Initially off
 
 // Used to time the main loop without using delay()
 unsigned long timeOfLastLoopSensors = 0;
@@ -95,8 +97,7 @@ void setup()
     pinMode(HEATER_LED_PWM_PIN, OUTPUT);
     pinMode(PIR_SENSOR_PIN, INPUT);
     pinMode(NOISE_SENSOR_PIN, INPUT);
-
-    pinMode(11, OUTPUT);
+    pinMode(GREEN_LED_PIN, OUTPUT);
 
     // Initially set the fan module to off
     analogWrite(FAN_MODULE_PWM_PIN, 0);
@@ -124,31 +125,34 @@ void loop()
     unsigned long now = millis();
 
     // Shouldn't need special care for overflow edge cases
-    if (soundEventHappened && now >= soundEventsBuffer.getFromTop() + SOUND_EVENTS_LEN_MIN)
+    if (soundEventHappened && now >= timeOfLastSoundEvent + SOUND_EVENTS_LEN_MIN)
     {
-        digitalWrite(11, 1);
-
         // Detect overflows
-        if (now < soundEventsBuffer.getFromTop())
-            soundEventsBuffer.reset();
+        // if (now < soundEventsBuffer.getFromTop())
+        //     soundEventsBuffer.reset();
 
         // New sound event -> register it in the deque
-        soundEventsBuffer.put(now);
+        // soundEventsBuffer.put(now);
 
         // Now let's purge the deque of all the events that occurred before now - soundInterval
-        while (now > soundInterval && soundEventsBuffer.get() < now - soundInterval)
-            soundEventsBuffer.pop();
+        // while (now > soundInterval && soundEventsBuffer.get() < now - soundInterval)
+        //     soundEventsBuffer.pop();
 
         // If the deque is full, it means that we have registered at least enough sound events in the latest soundInterval
         // -> there is probably a person in the room
-        if (soundEventsBuffer.isFull())
-            personSound = true;
+        // if (soundEventsBuffer.isFull())
+        //     personSound = true;
 
-        // DEBUG: print number of events in buffer to serial
-        Serial.print("noiseSensorISR: ");
-        Serial.println(soundEventsBuffer.count());
+        if (now <= timeOfLastSoundEvent + SOUND_EVENTS_LEN_MAX)
+        {
+            // This should be a double clap -> turn the led on
+            greenLedStatus = !greenLedStatus;
+            digitalWrite(GREEN_LED_PIN, greenLedStatus);
+        }
 
-        digitalWrite(11, 0);
+        timeOfLastSoundEvent = now;
+
+        Serial.println("Sound event happened!");
     }
 
     // Reset the flag anyway
@@ -179,14 +183,15 @@ void loop()
         T = 1.f / ((log(RoverR0) / B) + ONE_OVER_T0) - CELSIUS_OFFSET;
 
         // If enough time has passed since the last sound event, the person that (maybe) was in the room probably went away
-        if (now >= soundEventsBuffer.getFromTop() + timeoutSound)
-            personSound = false;
+        // if (now >= soundEventsBuffer.getFromTop() + timeoutSound)
+        //     personSound = false;
 
         // Read the PIR motion sensor
         if (digitalRead(PIR_SENSOR_PIN))
         {
             // There is a person in the room
-            personPir = true;
+            // personPir = true;
+            person = true;
 
             // Reset the time since last person
             millisSinceLastPerson = now;        
@@ -194,11 +199,12 @@ void loop()
         else if (now - millisSinceLastPerson >= timeoutPir)
         {
             // The timeout has passed, the person is probably not here anymore
-            personPir = false;
+            // personPir = false;
+            person = true;
         }
 
         // At this point, we can just OR the two contributes
-        person = personPir | personSound;
+        // person = personPir | personSound;
 
         // Get the proper setpoints
         float setPointACMin = person ? setPointACPersonMin : setPointACNoPersonMin;
@@ -239,10 +245,6 @@ void loop()
             lcd.setCursor(3, 0);
             lcd.print(T);
 
-            Serial.print("buf: ");
-            Serial.print(buf);
-            Serial.print(", ");
-
             // Update presence
             lcd.setCursor(14, 0);
             lcd.print(person);
@@ -257,5 +259,7 @@ void loop()
             lcd.setCursor(12, 1);
             lcd.print(buf);
         }
+
+        Serial.println("");
     }
 }

@@ -1,0 +1,5 @@
+.vscode/
+HW/.vscode/
+**/.DS_Store
+SW/__pycache__/
+SW/freeboard/

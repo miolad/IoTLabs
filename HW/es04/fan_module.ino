@@ -1,8 +1,8 @@
 const int FAN_MODULE_PWM_PIN = 9;
 const int STEPS_TO_FULL = 8;
 
-float pwmValue = 0.f;
-unsigned char pwmStepIndex = 0;
+byte pwmValue = 0;
+byte pwmStepIndex = 0;
 
 void setup()
 {

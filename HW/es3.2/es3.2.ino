@@ -3,7 +3,6 @@
 
 // -------------- CONSTANTS --------------
 #define TEMPERATURE_SENSOR_PIN  A0
-#define RED_LED_PIN             6 // Red led
 
 #define B 4275                                      // K
 #define ANALOG_REFERENCE 1023.f                     // V
@@ -56,7 +55,7 @@ int sendPOSTRequest(String data)
     // Use the 'curl' command
     p.begin("curl");
     p.addParameter("-H");
-    p.addParameter("Content-type: application/json");
+    p.addParameter(F("Content-type: application/json"));
     p.addParameter("-X");
     p.addParameter("POST");
     p.addParameter("-d");

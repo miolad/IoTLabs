@@ -9,3 +9,12 @@ class Device:
  
     def addEndPoint(self, endPoint: EndPoint):
         self.endPoints.append(endPoint)
+
+    def serialize(self) -> dict:
+        # Serializes the current Device object and returns a dict representing the same entity
+        serializedEndPoints = []
+
+        for e in self.endPoints:
+            serializedEndPoints.append(e.serializeEndPoint())
+        
+        return {"deviceID": self.deviceID, "endPoints": serializedEndPoints, "availableResoureces": self.availableResources, "timestamp": self.timestamp}

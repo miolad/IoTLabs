@@ -1,5 +1,6 @@
 .vscode/
 HW/.vscode/
 **/.DS_Store
-SW/part1/__pycache__/
+**/__pycache__/
 SW/part1/freeboard/
+SW/part2/catalog.json

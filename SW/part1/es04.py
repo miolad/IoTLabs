@@ -25,7 +25,11 @@ class FreeboardWebServer():
             # Couldn't open the file
             return "ERROR: Couldn't open the file 'freeboard/dashboard/dashboard.json'"
 
-        dashboard.write(params["json_string"])
+        try:
+            dashboard.write(params["json_string"])
+        except:
+            dashboard.close()
+            return "Invalid JSON string"
 
         dashboard.close()
 

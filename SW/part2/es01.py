@@ -1,4 +1,5 @@
 # Main class
+import EndPoint
 
 import cherrypy
 import json
@@ -8,14 +9,41 @@ class RESTCatalog():
 
     # Used to initialize the attributes
     def __init__(self):
-        self.MQTTGlobalMessageBrokerURL = ""
-        self.MQTTGlobalMessageBrokerPort = 1883 # Default MQTT port
+        # Initialize the database
+        self.database = {}
+        
+        self.database["MQTTGlobalMessageBrokerURL"] = ""
+        self.database["MQTTGlobalMessageBrokerPort"] = 1883 # Default MQTT port
+
+        self.database["devices"]  = {}
+        self.database["users"]    = {}
+        self.database["services"] = {}
 
     def GET(self, *uri, **params):
-        return "Ciao"
+        if len(uri) == 1 and uri[0] == "shutdown":
+            cherrypy.engine.exit()
+            return ""
     
     def PUT(self, *uri, **params):
-        pass
+        # Add Service
+        if len(uri) == 1 and uri[0] == "addService":
+            body = cherrypy.request.body.read()
+            try:
+                body = json.loads(body)
+            except:
+                cherrypy.response.status = 400 # Bad Request
+                return "Bad Request: invalid JSON"
+
+            # Check if the json contains everything we need
+            if "serviceID" not in body or "description" not in body or "endPoint" not in body:
+                cherrypy.response.status = 400 # Bad Request
+                return "Bad Request"
+
+            EndPoint.EndPoint.parseEndPoint(3)
+                
+        # The requested service does not exist
+        cherrypy.response.status = 404 # Not Found
+        return "Not Found"
 
     def POST(self, *uri, **params):
         # The POST method is only used for setting the global message broker url and port

@@ -8,3 +8,7 @@ class EndPoint:
     def __init__(self, service: str, type: bool):
         self.service = service
         self.type = type
+
+    @staticmethod
+    def parseEndPoint(endPointJSON: dict):
+        pass

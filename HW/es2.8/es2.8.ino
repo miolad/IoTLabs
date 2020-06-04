@@ -14,14 +14,14 @@
 #define SOUND_EVENTS_MIN        10   // 50 events in timeoutSound to register a person
 #define SOUND_EVENTS_LEN_MIN    500  // ms - the minimum length of time that must pass between two valid sound events
 
-#define B 4275                                      // K
-#define ANALOG_REFERENCE 1023.f                     // V
-#define ONE_OVER_T0 1.f / (25.0 + 273.15)           // K
-#define CELSIUS_OFFSET 273.15                       // K
+#define B                       4275                       // K
+#define ANALOG_REFERENCE        1023.f                     // V
+#define ONE_OVER_T0             1.f / (25.0 + 273.15)      // K
+#define CELSIUS_OFFSET          273.15                     // K
 
-#define LCD_SWITCH_PERIOD 5000 // ms
+#define LCD_SWITCH_PERIOD       5000                       // ms
 
-#define COMMAND_MAX_LENGTH 32
+#define COMMAND_MAX_LENGTH      32
 
 // -------------- VARIABLES --------------
 int analogValue;
@@ -87,10 +87,10 @@ void setup()
     pinMode(NOISE_SENSOR_PIN, INPUT);
 
     // Initially set the fan module to off
-    analogWrite(FAN_MODULE_PWM_PIN, 0);
+    analogWrite(FAN_MODULE_PWM_PIN, LOW);
 
     // Initially also set the heater led to off
-    analogWrite(HEATER_LED_PWM_PIN, 0);
+    analogWrite(HEATER_LED_PWM_PIN, LOW);
 
     // Set the ISR for the noise sensor
     attachInterrupt(digitalPinToInterrupt(NOISE_SENSOR_PIN), noiseSensorISR, FALLING);
@@ -168,7 +168,7 @@ void loop()
             // Reset the time since last person
             millisSinceLastPerson = now;        
         }
-        else if (now - millisSinceLastPerson >= timeoutPir)
+        else if (now >= millisSinceLastPerson + timeoutPir)
         {
             // The timeout has passed, the person is probably not here anymore
             personPir = false;

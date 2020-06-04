@@ -48,7 +48,7 @@ void updateDynamicContentLCD(float setPointACMin, float setPointACMax, float set
             lcd.setCursor(14, 0);
             lcd.print(person);
 
-            // The reason I'm doing all of this is because I want leading zeros on my percentaces, but I don't want
+            // The reason I'm doing all of this is because I want leading zeros on my percentages, but I don't want
             // to waste 5% of the available space for programs on the arduino to sprintf
 
             // Update AC

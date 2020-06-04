@@ -5,42 +5,78 @@ import conversions
 class RESTWebService():
     exposed = True
     validUnits = ["C", "K", "F"]
+    listValue = []
 
     def buildJSON(self, originalValue: float, originalUnit: str, targetValue: float, targetUnit: str) -> str:
         retJSON = {"originalValue": originalValue, "originalUnit": originalUnit, "targetValue": targetValue, "targetUnit": targetUnit}
         return json.dumps(retJSON)
 
     def GET(self, *uri, **params):
+        if len(uri) < 1:
+            # Whathever the uri was, it's not valid
+            # Set the appropriate HTTP status
+            cherrypy.response.status = 404 # Not Found
+            return "Command not supported!"
+
         # Shutdown on "shutdown". Used for debugging purposes
-        if len(uri) == 1 and uri[0] == "shutdown":
+        if uri[0] == "shutdown":
             cherrypy.engine.exit()
             return ""
 
-        # Check if the 'command' is valid
-        if len(uri) == 0 or uri[0] != "converter":
-            return "Please choose a valid command!<br>Only 'converter' is implemented for now."
+        if uri[0] == "converter":
+            # Check if the parameters are valid
+            if len(uri) != 4:
+                cherrypy.response.status = 400 # Bad Request
+                return "Invalid parameters!<br>Usage: converter/&ltvalue&gt/&lt;originalUnit&gt/&lt;targetUnit&gt;."
 
-        # Check if the parameters are valid
-        if len(uri) != 4:
-            return "Invalid parameters!<br>Usage: converter/&ltvalue&gt/&lt;originalUnit&gt/&lt;targetUnit&gt;."
+            originalUnit = uri[2].upper()
+            targetUnit = uri[3].upper()
 
-        originalUnit = uri[2].upper()
-        targetUnit = uri[3].upper()
+            # Check if the units are valid
+            if originalUnit not in self.validUnits or targetUnit not in self.validUnits:
+                cherrypy.response.status = 400 # Bad Request
+                return "Invalid temperature unit!<br>Valid units are:<ul><li>C - Celsius</li><li>K - Kelvin</li><li>F - Fahrenheit</li></ul>"
 
-        # Check if the units are valid
-        if originalUnit not in self.validUnits or targetUnit not in self.validUnits:
-            return "Invalid temperature unit!<br>Valid units are:<ul><li>C - Celsius</li><li>K - Kelvin</li><li>F - Fahrenheit</li></ul>"
+            try:
+                originalValue = float(uri[1])
+            except:
+                # The numerical value is invalid!
+                cherrypy.response.status = 400 # Bad Request
+                return "Invalid temperature value!"
+            
+            # Perform the conversion
+            try:
+                targetValue = conversions.convert(originalValue, originalUnit, targetUnit)
+            except ValueError as e:
+                cherrypy.response.status = 400 # Bad Request
+                return str(e)
 
-        try:
-            originalValue = float(uri[1])
-        except:
-            # The numerical value is invalid!
-            return "Invalid temperature value!"
-        
-        # Perform the conversion
-        targetValue = conversions.convert(originalValue, originalUnit, targetUnit)
+            return self.buildJSON(originalValue, originalUnit, targetValue, targetUnit)
 
-        return self.buildJSON(originalValue, originalUnit, targetValue, targetUnit)
+        if uri[0] == "log":
+            # Log all the temperature data received so far
+            return json.dumps(self.listValue) # Use json.dumps to print the list instead of just converting
+                                              # it into a string to print with the double quotes to be compliant with JSON
+
+        # The command is not valid
+        cherrypy.response.status = 404 # Not Found
+        return "Command not supported!"
+
+    def POST(self, *uri, **params):
+        # Check if the uri is valid
+        if len(uri) == 1 and uri[0] == "log":
+            body = cherrypy.request.body.read();
+            val = json.loads(body);
+
+            # Check if the received JSON is correct
+            if ("bn" not in val or val["bn"] != "Yun" or "e" not in val
+                    or "n" not in val["e"][0] or val ["e"][0]["n"] != "temperature"
+                    or "t" not in val["e"][0] or "v" not in val["e"][0] or "u" not in val["e"][0]):
+                # The body is not what we expected -> reject it
+                cherrypy.response.status = 400 # Bad Request
+                return
+
+            self.listValue.append(val)
 
 if __name__ == "__main__":
     conf = {
@@ -51,7 +87,6 @@ if __name__ == "__main__":
     }
 
     cherrypy.tree.mount(RESTWebService(), "/", conf)
-
     cherrypy.config.update({"server.socket_host": "0.0.0.0"})
 
     cherrypy.engine.start()

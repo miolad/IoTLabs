@@ -60,6 +60,7 @@ int sendPOSTRequest(String data)
     p.addParameter("POST");
     p.addParameter("-d");
     p.addParameter(data);
+    p.addParameter("-m 5"); // Add a reasonable timeout to not block the whole board waiting for the server
     p.addParameter(F("http://192.168.1.37:8080/log"));
 
     // Run the command

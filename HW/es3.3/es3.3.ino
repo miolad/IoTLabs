@@ -28,6 +28,7 @@ float RoverR0, T;
 unsigned long previousIteration = 0, previousPublishTime = 0;
 bool forceLoop = true;
 
+// Trying to use the least memory as possible, otherwise bad things will happen
 const int jsonCapacity = 100;
 char* jsonResult; // Used to store the result of the serialization
 

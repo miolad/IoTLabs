@@ -1,5 +1,10 @@
 # Main class
-import EndPoint
+from EndPoint import EndPoint
+from Device import Device
+from User import User
+from Service import Service
+
+import datetime
 
 import cherrypy
 import json
@@ -23,6 +28,45 @@ class RESTCatalog():
         if len(uri) == 1 and uri[0] == "shutdown":
             cherrypy.engine.exit()
             return ""
+
+        if(uri[0] == "getUser" and params!={}):
+            userID = params.get("id")
+            if userID in self.database["users"]:
+                return json.dumps(self.database["users"].get(userID))
+
+            # Set the HTTP status
+            cherrypy.response.status = 404 # Not Found
+            return "No such user"
+           
+        if uri[0] == "getUsers":
+            return json.dumps(list(self.database["users"]))
+ 
+        if(uri[0] == "getDevice" and params!={}):
+            deviceID = params.get("id")
+            if deviceID in self.database["devices"]:
+                return json.dumps(self.database["devices"].get(deviceID))
+
+            # Set the HTTP status
+            cherrypy.response.status = 404 # Not Found
+            return "No such device"
+           
+        if(uri[0] == "getDevices" and params!={}):
+            return json.dumps(list(self.database["devices"]))
+       
+        if(uri[0] == "getService" and params!={}):
+            serviceID = params.get("id")
+            if serviceID in self.database["services"]:
+                return json.dumps(self.database["services"].get(serviceID))
+            
+            # Set the HTTP status
+            cherrypy.response.status = 404 # Not Found
+            return "No such service"
+           
+        if uri[0] == "getServices":
+            return json.dumps(list(self.database["services"].values()))
+
+        cherrypy.response.status = 404 # Not Found
+        return "Not Found"
     
     def PUT(self, *uri, **params):
         # Add Service
@@ -35,11 +79,26 @@ class RESTCatalog():
                 return "Bad Request: invalid JSON"
 
             # Check if the json contains everything we need
-            if "serviceID" not in body or "description" not in body or "endPoint" not in body:
+            if "serviceID" not in body or "description" not in body or "endPoints" not in body:
                 cherrypy.response.status = 400 # Bad Request
                 return "Bad Request"
 
-            EndPoint.EndPoint.parseEndPoint(3)
+            s = Service(body["serviceID"])
+            s.description = body["description"]
+
+            # Get the end points
+            for endPointDict in body["endPoints"]:
+                try:
+                    s.addEndPoint(endPointDict)
+                except:
+                    # Invalid endpoint
+                    cherrypy.response.status = 400 # Bad Request
+                    return "Bad Request: invalid end points!"
+
+            # Now insert the newly created service into the database
+            self.database["services"][s.uniqueID] = s.serializeService()
+
+            return "INSERT SERVICE SUCCESS"
                 
         # The requested service does not exist
         cherrypy.response.status = 404 # Not Found

@@ -12,3 +12,7 @@ class Service:
 
     def addEndPoint(self, endPoint: EndPoint):
         self.endPoints.append(endPoint)
+
+    def serializeService(self) -> dict:
+        # Serializes the current Service object and returns a dict representing the same entity
+        return {"serviceID": self.uniqueID, "description": self.description, "endPoints": self.endPoints}

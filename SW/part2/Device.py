@@ -2,10 +2,10 @@
 from EndPoint import EndPoint
  
 class Device:
-    def __init__(self,deviceID,availableResources)
+    def __init__(self, deviceID, availableResources):
         self.deviceID = deviceID
         self.endPoints = list()
-        self.availableResources = avaliableResources
+        self.availableResources = availableResources
  
-    def addEndPoint(endPoint: EndPoint):
+    def addEndPoint(self, endPoint: EndPoint):
         self.endPoints.append(endPoint)

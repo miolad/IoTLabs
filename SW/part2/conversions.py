@@ -26,6 +26,7 @@ def kelvinToFahrenheit(val: float) -> float:
 
 # Converts the specified value from the original unit to the target unit.
 # The units must be one of "K", "C", or "F". They must be uppercase.
+# Raises ValueError in case the temperature is physically impossible.
 def convert(val: float, originalUnit: str, targetUnit: str) -> float:
     # Assume the units are correct
 
@@ -43,6 +44,10 @@ def convert(val: float, originalUnit: str, targetUnit: str) -> float:
         valKelvin = celsiusToKelvin(val)
     else:
         valKelvin = fahrenheitToKelvin(val)
+
+    # Check for impossible temperatures
+    if valKelvin < 0:
+        raise ValueError("Impossible temperature")
 
     # Then convert to targetUnit
     if targetUnit == "K":
@@ -63,6 +68,10 @@ def convertMultiple(vals: List[float], originalUnit: str, targetUnit: str) -> Li
     valsTarget = []
 
     for v in vals:
-        valsTarget.append(convert(v, originalUnit, targetUnit))
+        try:
+            valsTarget.append(convert(v, originalUnit, targetUnit))
+        except ValueError:
+            # If a value is invalid, insert a special string
+            valsTarget.append("???")
 
     return valsTarget

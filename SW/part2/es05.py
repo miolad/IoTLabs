@@ -8,14 +8,14 @@ from typing import *
 import datetime
 import threading
 import time
-
 import cherrypy
 import json
+import paho.mqtt.client as PahoMQTT
 
 class RESTCatalog():
     exposed = True
 
-    # Thread class to manage timeouts for RESTCatalog
+    # Thread subclass to manage timeouts for RESTCatalog
     # It is an inner class because it's only purpose is to work together with the Catalog
     # Also, it is a class and not just a function to pass to threading.Thread because I needed a
     # class for a cherrypy plugin anyway (to be notified of shutdown)
@@ -74,6 +74,54 @@ class RESTCatalog():
 
             # Notify the waiting thread
             self.wakeEvent.set()
+    
+    # MQTT subscriber class to listen for device subscriptions over the mqtt protocol, too
+    class MQTTDeviceSubscriptionListener:
+        def __init__(self, mqttBrokerURL: str, mqttBrokerPORT: int, clientID: str, topic: str, catalog):
+            self.brokerURL = mqttBrokerURL
+            self.brokerPORT = mqttBrokerPORT
+            self.clientID = clientID
+            self.topic = topic
+            self.catalog = catalog
+
+            # Create the mqtt client instance and register the callbacks
+            self._paho_mqtt = PahoMQTT.Client(self.clientID, True) # Transient session
+            self._paho_mqtt.on_connect = self.onConnect
+            self._paho_mqtt.on_message = self.onMessage
+
+            # Connect to the broker and subscribe to the assigned topic
+            try:
+                self._paho_mqtt.connect(self.brokerURL, self.brokerPORT)
+                self._paho_mqtt.loop_start()
+                self._paho_mqtt.subscribe(self.topic, 2)
+            except:
+                print("Error connecting to mqtt broker")
+
+        def onConnect(self, client, userdata, flags, rc):
+            print("Successfully connected to the MQTT broker")
+
+        def onMessage(self, client, userdata, message):
+             # Parse and add the device
+            try:
+                payload = json.loads(message.payload)
+            except:
+                print("MQTT: Received invalid JSON")
+ 
+            try:
+                d = Device.parseDevice(payload)
+            except ValueError as e:
+                print("MQTT: Invalid data in JSON: " + str(e))
+
+            # Add timestamp
+            d.timestamp = str(datetime.datetime.now())
+ 
+            # Now insert the newly created device into the database
+            self.catalog.database["devices"][d.deviceID] = d
+
+            # Save the new JSON file
+            self.catalog.serializeCatalogToJSONFile()
+
+            print("MQTT: Device added/updated successfully")
 
     # Used to initialize the attributes
     def __init__(self):
@@ -101,6 +149,10 @@ class RESTCatalog():
         self.timeoutManagerRunner = RESTCatalog.TimeoutManagerRunner(self, cherrypy.engine, 120, 60)
         self.timeoutManagerRunner.subscribe() # To be notified from cherrypy
         #self.timeoutManagerRunner.start()    # cherrypy calls the start() of its plugins, which happens to be the same method to start threads
+
+        # Initialize the MQTT subscriber client
+        self.mqttDeviceSubscriber = RESTCatalog.MQTTDeviceSubscriptionListener(self.database["MQTTGlobalMessageBrokerURL"],
+            self.database["MQTTGlobalMessageBrokerPort"], "tiot19CatalogSubscriber", "/tiot/19/catalog/addDevice", self)
 
     # Custom serializer for json.dumps(...)
     def customSerializer(self, obj):

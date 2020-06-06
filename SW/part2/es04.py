@@ -56,7 +56,7 @@ class RESTWebService():
                 {"service": "http://localhost:8081/log", "type": "webService"}]
             }
         )
-        self.catalogSubscriber = RESTWebService.ServiceCatalogSubscriberRunner(cherrypy.engine, 5, self.registerPayload, "http://localhost:8080/addService")
+        self.catalogSubscriber = RESTWebService.ServiceCatalogSubscriberRunner(cherrypy.engine, 60, self.registerPayload, "http://localhost:8080/addService")
         self.catalogSubscriber.subscribe() # This also starts the thread
 
     def buildJSON(self, originalValue: float, originalUnit: str, targetValue: float, targetUnit: str) -> str:

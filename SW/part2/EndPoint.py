@@ -20,19 +20,19 @@ class EndPoint:
         return e
 
     @staticmethod
-    def parseEndPoint(endPointDict: dict):
-        if "service" not in endPointDict or "type" not in endPointDict:
-            raise SyntaxError("dict is not valid")
+    def parseEndPoint(endPointDesc: dict):
+        if "service" not in endPointDesc or "type" not in endPointDesc:
+            raise ValueError("dict is not valid")
 
-        endPoint = EndPoint(endPointDict["service"], endPointDict["type"])
+        endPoint = EndPoint(endPointDesc["service"], endPointDesc["type"])
 
         if endPoint.endPointType == EndPoint.TYPE_MQTT_TOPIC:
-            if "mqttClientType" not in endPointDict:
-                raise SyntaxError("dict is not valid")
+            if "mqttClientType" not in endPointDesc:
+                raise ValueError("dict is not valid")
                 
-            if endPointDict["mqttClientType"] != EndPoint.MQTT_PUBLISHER and endPointDict["mqttClientType"] != EndPoint.MQTT_SUBSCRIBER:
-                raise SyntaxError("dict is not valid")
+            if endPointDesc["mqttClientType"] != EndPoint.MQTT_PUBLISHER and endPointDesc["mqttClientType"] != EndPoint.MQTT_SUBSCRIBER:
+                raise ValueError("dict is not valid")
 
-            endPoint.mqttPublishOrSubscribe = endPointDict["mqttClientType"]
+            endPoint.mqttPublishOrSubscribe = endPointDesc["mqttClientType"]
 
         return endPoint

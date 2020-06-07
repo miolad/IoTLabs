@@ -28,8 +28,9 @@ class RESTWebService():
                 print("Registering to the catalog...")
                 
                 try:
-                    response = requests.put(self.catalogURL, data = self.subscriptionPayload, timeout = 1.5)
-                except (ConnectionError, requests.HTTPError, requests.Timeout):
+                    response = requests.put(self.catalogURL, data = self.subscriptionPayload)
+                    response.raise_for_status()
+                except:
                     print("An error occurred while performing the request to the service catalog.")
                 else:
                     print("Registration successful, got " + response.text)
@@ -56,7 +57,10 @@ class RESTWebService():
                 {"service": "http://localhost:8081/log", "type": "webService"}]
             }
         )
-        self.catalogSubscriber = RESTWebService.ServiceCatalogSubscriberRunner(cherrypy.engine, 60, self.registerPayload, "http://localhost:8080/addService")
+        self.catalogURL = "http://localhost"
+        self.catalogPORT = 8080
+        self.catalogSubscriber = RESTWebService.ServiceCatalogSubscriberRunner(cherrypy.engine, 60, self.registerPayload,
+            self.catalogURL + ":" + str(self.catalogPORT) + "/addService")
         self.catalogSubscriber.subscribe() # This also starts the thread
 
     def buildJSON(self, originalValue: float, originalUnit: str, targetValue: float, targetUnit: str) -> str:

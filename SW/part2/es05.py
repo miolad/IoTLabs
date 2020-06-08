@@ -329,6 +329,7 @@ class RESTCatalog():
         # Add Device
         if len(uri) == 1 and uri[0] == "addDevice":
             body = cherrypy.request.body.read()
+            print("got: " + str(body.decode()))
             try:
                 body = json.loads(body)
             except:

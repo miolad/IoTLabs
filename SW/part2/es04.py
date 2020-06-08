@@ -121,8 +121,8 @@ class RESTWebService():
     def POST(self, *uri, **params):
         # Check if the uri is valid
         if len(uri) == 1 and uri[0] == "log":
-            body = cherrypy.request.body.read();
-            val = json.loads(body);
+            body = cherrypy.request.body.read()
+            val = json.loads(body)
 
             # Check if the received JSON is correct
             if ("bn" not in val or val["bn"] != "Yun" or "e" not in val

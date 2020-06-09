@@ -21,7 +21,7 @@
 // Period for subscribing to the device catalog via HTTP PUT
 #define SUBSCRIBE_TO_CATALOG_PERIOD_LENGTH 60000    // ms
 
-#define DEVICE_SUBSCRIPTION_JSON_STRING     F("{\"deviceID\": \"Yun\", \"availableResources\": [\"temperature\", \"led\"], \"endPoints\": [{\"service\": \"/tiot/19/temperature\", \"type\": \"mqttTopic\", \"mqttClientType\": \"publisher\"}, {\"service\": \"/tiot/19/led\", \"type\": \"mqttTopic\", \"mqttClientType\": \"subscriber\"}]}")
+#define DEVICE_SUBSCRIPTION_JSON_STRING     F("{\"deviceID\": \"Yun\", \"resources\": [\"temperature\", \"led\"], \"endPoints\": [{\"service\": \"/tiot/19/temperature\", \"type\": \"mqttTopic\", \"mqttClientType\": \"publisher\"}, {\"service\": \"/tiot/19/led\", \"type\": \"mqttTopic\", \"mqttClientType\": \"subscriber\"}]}")
 #define CATALOG_END_POINT                   F("http://192.168.1.37:8080/addDevice")
 
 const char BASE_TOPIC[] = "/tiot/19/";
@@ -32,7 +32,7 @@ int analogValue;
 float RoverR0, T;
 
 unsigned long previousIteration = 0, previousPublishTime = 0, previousSubscribeTime = 0;
-bool forceLoop = true;
+bool forceLoop = true, forceSubscription = true;
 
 // Trying to use the least memory as possible, otherwise bad things will happen
 const int jsonCapacity = 100;
@@ -145,9 +145,6 @@ void setup()
     // Initialize the mqtt library
     mqtt.begin(F("test.mosquitto.org"), 1883);
     mqtt.subscribe(BASE_TOPIC + String("led"), mqttLedSubscribeCallback);
-
-    // Subscribe to the catalog for the first time
-    subscribeToCatalog();
 }
 
 void loop()
@@ -179,11 +176,14 @@ void loop()
         // Immediately free the char buffer
         free(jsonResult);
     }
-    if (now >= previousSubscribeTime + SUBSCRIBE_TO_CATALOG_PERIOD_LENGTH)
+    if (now >= previousSubscribeTime + SUBSCRIBE_TO_CATALOG_PERIOD_LENGTH || forceSubscription)
     {
         previousSubscribeTime = now;
+        forceSubscription = false;
 
-        // Refresh the subscription
-        subscribeToCatalog();
+        // Refresh the subscription (TODO: Choose a method)
+        //subscribeToCatalog();
+
+        mqtt.publish(BASE_TOPIC + String("catalog/addDevice"), DEVICE_SUBSCRIPTION_JSON_STRING);
     }
 }

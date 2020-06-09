@@ -17,15 +17,15 @@ class Device:
         for e in self.endPoints:
             serializedEndPoints.append(e.serializeEndPoint())
         
-        return {"deviceID": self.deviceID, "endPoints": serializedEndPoints, "availableResoureces": self.availableResources, "timestamp": self.timestamp}
+        return {"deviceID": self.deviceID, "endPoints": serializedEndPoints, "resources": self.availableResources, "timestamp": self.timestamp}
 
     @staticmethod
     def parseDevice(deviceDesc: dict):
         # Check if every field is present, otherwise raise an exception
-        if "deviceID" not in deviceDesc or "endPoints" not in deviceDesc or "availableResources" not in deviceDesc:
+        if "deviceID" not in deviceDesc or "endPoints" not in deviceDesc or "resources" not in deviceDesc:
             raise ValueError("JSON doesn't contain necessary params")
 
-        d = Device(deviceDesc["deviceID"], deviceDesc["availableResources"])
+        d = Device(deviceDesc["deviceID"], deviceDesc["resources"])
 
         # Now add the endpoints
         for endPointDesc in deviceDesc["endPoints"]:

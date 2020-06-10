@@ -1,6 +1,5 @@
 #include <ArduinoJson.h>
 #include <Bridge.h>
-#include <Process.h>
 #include <MQTTclient.h>
 
 // -------------- CONSTANTS --------------

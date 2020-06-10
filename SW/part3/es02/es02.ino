@@ -1,6 +1,5 @@
 #include <ArduinoJson.h>
 #include <Bridge.h>
-#include <Process.h>
 #include <MQTTclient.h>
 
 // -------------- CONSTANTS --------------
@@ -18,7 +17,6 @@
 // Period for publishing new temperature readings
 #define PUBLISH_PERIOD_LENGTH 10000                 // ms
 
-// Period for subscribing to the device catalog via HTTP PUT
 #define SUBSCRIBE_TO_CATALOG_PERIOD_LENGTH 60000    // ms
 
 #define DEVICE_SUBSCRIPTION_JSON_STRING     F("{\"deviceID\": \"Yun\", \"resources\": [\"temperature\", \"led\"], \"endPoints\": [{\"service\": \"/tiot/19/temperature\", \"type\": \"mqttTopic\", \"mqttClientType\": \"publisher\"}, {\"service\": \"/tiot/19/led\", \"type\": \"mqttTopic\", \"mqttClientType\": \"subscriber\"}]}")
@@ -37,24 +35,6 @@ bool forceLoop = true, forceSubscription = true;
 // Trying to use the least memory as possible, otherwise bad things will happen
 const int jsonCapacity = 100;
 char* jsonResult; // Used to store the result of the serialization
-
-// Subscribe to the device catalog via a HTTP PUT request
-void subscribeToCatalog()
-{
-    Process p;
-
-    p.begin("curl");
-    p.addParameter("-H");
-    p.addParameter(F("Content-type: application/json"));
-    p.addParameter("-X");
-    p.addParameter("PUT");
-    p.addParameter("-d");
-    p.addParameter(DEVICE_SUBSCRIPTION_JSON_STRING);
-    p.addParameter("-m 5"); // Add a reasonable timeout to not block the whole board waiting for the server
-    p.addParameter(CATALOG_END_POINT);
-
-    p.run();
-}
 
 void mqttLedSubscribeCallback(const String& topic, const String& subtopic, const String& message)
 {
@@ -180,9 +160,6 @@ void loop()
     {
         previousSubscribeTime = now;
         forceSubscription = false;
-
-        // Refresh the subscription (TODO: Choose a method)
-        //subscribeToCatalog();
 
         mqtt.publish(BASE_TOPIC + String("catalog/addDevice"), DEVICE_SUBSCRIPTION_JSON_STRING);
     }

@@ -6,7 +6,7 @@
 #define TEMPERATURE_SENSOR_PIN  A0
 #define FAN_MODULE_PWM_PIN      9
 #define HEATER_LED_PWM_PIN      6
-#define PIR_SENSOR_PIN          13
+#define PIR_SENSOR_PIN          10
 #define NOISE_SENSOR_PIN        7
 
 #define PERIOD_LENGTH_SENSORS   2500 // ms - period of sensor-polling main loop

@@ -84,7 +84,6 @@ class MQTTTemperatureReceiver:
         print("Connected to mqtt broker")
 
     def onMessage(self, client, userdata, message):
-        # Debug
         print(message.payload.decode())
 
     def run(self, characterToExit: str):
@@ -101,6 +100,9 @@ class MQTTTemperatureReceiver:
         self.running = False
         self.stopThreadEvent.set()
         self.subscribeThread.join()
+
+        # Stop the mqtt thread
+        self.mqttClient.loop_stop(force = False)
 
     # Function to run in a separate thread that registers this as a web service to the catalog
     def subscribeAsService(self):

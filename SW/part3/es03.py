@@ -5,7 +5,7 @@ import threading
 
 # Class to publish to the mqtt topic to control the LED connected to the Yun
 class MQTTLedController:
-    def __init__(self, catalogURL: str, catalogPORT: str, deviceID: str, period: float):
+    def __init__(self, catalogURL: str, catalogPORT: int, deviceID: str, period: float):
         self.catalogURL = catalogURL
         self.catalogPORT = catalogPORT
         self.deviceID = deviceID
@@ -43,11 +43,11 @@ class MQTTLedController:
         try:
             if "deviceID" not in device or device["deviceID"] != self.deviceID or "resources" not in device or "endPoints" not in device or len(device["resources"]) != len(device["endPoints"]):
                 raise Exception()
-            temperatureResourceIndex = device["resources"].index("led")
+            ledResourceIndex = device["resources"].index("led")
         except:
             raise Exception("Device descriptor invalid or incomplete")
 
-        endPoint = device["endPoints"][temperatureResourceIndex] # This should be the end point we're interested in
+        endPoint = device["endPoints"][ledResourceIndex] # This should be the end point we're interested in
 
         # We expect an mqtt topic set as 'subscriber'
         if "service" not in endPoint or "type" not in endPoint or endPoint["type"] != "mqttTopic" or "mqttClientType" not in endPoint or endPoint["mqttClientType"] != "subscriber":
@@ -111,6 +111,9 @@ class MQTTLedController:
         self.stopThreadEvent.set()
         self.subscribeThread.join()
 
+        # Stop the mqtt thread
+        self.mqttClient.loop_stop(force = False)
+
     # Function to run in a separate thread that registers this as a web service to the catalog
     def subscribeAsService(self):
         while self.running:
@@ -125,11 +128,11 @@ class MQTTLedController:
 
 if __name__ == "__main__":
     try:
-        temperatureReceiver = MQTTLedController("http://localhost", 8080, "Yun", 60)
+        ledController = MQTTLedController("http://localhost", 8080, "Yun", 60)
     except Exception as e:
         print(str(e))
         exit(-1)
 
-    temperatureReceiver.run("q")
+    ledController.run("q")
 
     print("Exiting...")

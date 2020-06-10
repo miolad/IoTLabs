@@ -12,7 +12,7 @@ import cherrypy
 import json
 import paho.mqtt.client as PahoMQTT
 
-class RESTCatalog():
+class RESTCatalog:
     exposed = True
 
     # Thread subclass to manage timeouts for RESTCatalog

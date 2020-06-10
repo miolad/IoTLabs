@@ -146,7 +146,7 @@ class RemoteSmartHomeController(cherrypy.process.plugins.SimplePlugin):
             }]
         }
 
-        self.mainLoopPeriod = 1
+        self.mainLoopPeriod = 2
         self.mainLoopThread = threading.Thread(target = self.mainLoop)
         self.mainLoopThread.start()
 
@@ -188,7 +188,7 @@ class RemoteSmartHomeController(cherrypy.process.plugins.SimplePlugin):
             # Update dynamic content on the lcd
             if self.currentLCDMode == 0:
                 self.lcdChangeDict["e"][0]["n"] = 0 # First line
-                self.lcdChangeDict["e"][0]["v"] = "T: " + str("%3.1f" % self.currentTemperature) + ", Pres: " + str(int(self.person["global"]))
+                self.lcdChangeDict["e"][0]["v"] = "T: " + str("%3.1f" % self.currentTemperature) + ", Pres: " + str(int(self.person["global"])) + " "
                 self.mqttClient.publish(self.topics["lcd"]["topic"], payload = json.dumps(self.lcdChangeDict), qos = 2)
                 self.lcdChangeDict["e"][0]["n"] = 1 # First line
                 self.lcdChangeDict["e"][0]["v"] = "AC:" + str("%03d" % (percents["AC"] * 100)) + "%, HT:" + str("%03d" % (percents["HT"] * 100)) + "%"
@@ -205,6 +205,7 @@ class RemoteSmartHomeController(cherrypy.process.plugins.SimplePlugin):
             # Debug
             # print("Person: " + str(self.person["global"]))
             # print("Set points: " + str(setPoints))
+            # print("T: " + str(self.currentTemperature))
 
             self.stopThreadEvent.wait(self.mainLoopPeriod) 
 

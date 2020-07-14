@@ -78,7 +78,6 @@ void processConnection(BridgeClient client)
             // Set the LED accordingly
             digitalWrite(RED_LED_PIN, val);
 
-            // TODO: Print response
             printResponse(client, 200, encodeSenML("led", val, ""));
         }
         else

@@ -74,6 +74,12 @@ class RESTCatalog:
 
             # Notify the waiting thread
             self.wakeEvent.set()
+
+            # Notify the mqtt subscriber of shutdown
+            try:
+                self.mqttSubscriber.stop()
+            except:
+                pass
     
     # MQTT subscriber class to listen for device subscriptions over the mqtt protocol, too
     class MQTTDeviceSubscriptionListener:
@@ -98,7 +104,10 @@ class RESTCatalog:
                 print("Error connecting to mqtt broker")
 
         def onConnect(self, client, userdata, flags, rc):
-            print("Successfully connected to the MQTT broker")
+            if rc == 0:
+                print("Successfully connected to the MQTT broker")
+            else:
+                print("Connection to MQTT broker failed: rc = " + str(rc))
 
         def onMessage(self, client, userdata, message):
              # Parse and add the device
@@ -122,6 +131,14 @@ class RESTCatalog:
             self.catalog.serializeCatalogToJSONFile()
 
             print("MQTT: Device added/updated successfully")
+
+        def stop(self):
+            # Stop the MQTT susbcriber
+            # Unsubscribe from the topic
+            self._paho_mqtt.unsubscribe(self.topic)
+            self._paho_mqtt.loop_stop()
+            self._paho_mqtt.disconnect()
+            print("Shutting down mqtt...")
 
     # Used to initialize the attributes
     def __init__(self):
@@ -154,6 +171,9 @@ class RESTCatalog:
         self.mqttDeviceSubscriber = RESTCatalog.MQTTDeviceSubscriptionListener(self.database["MQTTGlobalMessageBrokerURL"],
             self.database["MQTTGlobalMessageBrokerPort"], "tiot19CatalogSubscriber", "/tiot/19/catalog/addDevice", self)
 
+        # Register the MQTT subscriber client to the thread to be notified of shutdown, too
+        self.timeoutManagerRunner.mqttSubscriber = self.mqttDeviceSubscriber
+
     # Custom serializer for json.dumps(...)
     def customSerializer(self, obj):
         if isinstance(obj, (Service, User, Device)):
@@ -172,7 +192,7 @@ class RESTCatalog:
         try:
             jsonFile.write(json.dumps(self.database, default=self.customSerializer))
         except:
-            # The database is somehow invalid
+            # The database is somehow invalid or the file can't be written
             pass
 
         jsonFile.close()

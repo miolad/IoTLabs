@@ -92,8 +92,8 @@ class RemoteSmartHomeController(cherrypy.process.plugins.SimplePlugin):
         self.subscribePayload = json.dumps(
             {
                 "serviceID": "RemoteSmartHomeController",
-                "description": "A remote implementation of the Smart Home Controller featuring the Yun as the edge node. POST to /changeSetPoint to edit set points, by using the desired params, such as 'ht' and 'ac', together with the boolean 'person'",
-                "endPoints": [{"service": "/changeSetPoint", "type": "webService"}]
+                "description": "A remote implementation of the Smart Home Controller featuring the Yun as the edge node. POST to /changeSetPoint to edit set points, by using the desired params - such as 'ht' and 'ac' - together with the boolean 'person'",
+                "endPoints": [{"service": "/changeSetPoint", "type": "webService", "webType": "consumer"}]
             })
 
         # Start the subscribing thread and subscribe this class as a cherrypy plugin

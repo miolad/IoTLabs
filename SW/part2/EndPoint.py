@@ -6,16 +6,21 @@ class EndPoint:
 
     MQTT_PUBLISHER      = "publisher"
     MQTT_SUBSCRIBER     = "subscriber"
+
+    # Whether the service is used to pass data/commands to the device/web service or to get data/information
+    WEB_TYPE_PRODUCER   = "producer" # Use the service to get data
+    WEB_TYPE_CONSUMER   = "consumer" # Use the service to give commands
     
     def __init__(self, service: str, endPointType: bool):
         self.service = service
         self.endPointType = endPointType
-        self.mqttPublishOrSubscribe = EndPoint.MQTT_PUBLISHER # Default option
 
     def serializeEndPoint(self) -> dict:
         e = {"service": self.service, "type": self.endPointType}
         if self.endPointType == EndPoint.TYPE_MQTT_TOPIC:
             e["mqttClientType"] = self.mqttPublishOrSubscribe
+        elif self.endPointType == EndPoint.TYPE_WEB_SERVICE:
+            e["webType"] = self.webType
 
         return e
 
@@ -34,5 +39,14 @@ class EndPoint:
                 raise ValueError("dict is not valid")
 
             endPoint.mqttPublishOrSubscribe = endPointDesc["mqttClientType"]
+
+        elif endPoint.endPointType == EndPoint.TYPE_WEB_SERVICE:
+            if "webType" not in endPointDesc:
+                raise ValueError("dict is not valid")
+
+            if endPointDesc["webType"] != EndPoint.WEB_TYPE_PRODUCER and endPointDesc["webType"] != EndPoint.WEB_TYPE_CONSUMER:
+                raise ValueError("dict is not valid")
+
+            endPoint.webType = endPointDesc["webType"]
 
         return endPoint

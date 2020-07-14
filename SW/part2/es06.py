@@ -65,11 +65,11 @@ class EdgeDeviceEmulator(threading.Thread):
 if __name__ == "__main__":
     payload = json.dumps({
         "deviceID": "emulatorDevice",
-        "availableResources": ["humidity", "temperature"],
+        "availableResources": ["humidityHTTP", "humidityMQTT", "temperatureHTTP", "temperatureMQTT"],
         "endPoints": [
-            {"service": "localhost:8080/getHumidity", "type": "webService"},
+            {"service": "localhost:8080/getHumidity", "type": "webService", "webType": "producer"},
             {"service": "/tiot/19/emulatorDevice/humidity", "type": "mqttTopic", "mqttClientType": "publisher"},
-            {"service": "localhost:8080/getTemperature", "type": "webService"},
+            {"service": "localhost:8080/getTemperature", "type": "webService", "webType": "producer"},
             {"service": "/tiot/19/emulatorDevice/temperature", "type": "mqttTopic", "mqttClientType": "publisher"}
         ]
     })

@@ -53,8 +53,8 @@ class RESTWebService():
                 "serviceID": "temperatureServiceV1",
                 "description": "A temperature converter between C, F and K. Pass the temperatures as HTTP GET parameters: /converter?value=<original_value>&originalUnit=<original_unit>&targetUnit=<target_unit>. \
                     Additionally, get the current log of temperatures recorder by the edge sensor via HTTP GET at /log, or add to the log via HTTP POST at /log",
-                "endPoints": [{"service": "http://localhost:8081/converter", "type": "webService"},
-                {"service": "http://localhost:8081/log", "type": "webService"}]
+                "endPoints": [{"service": "http://localhost:8081/converter", "type": "webService", "webType": "producer"},
+                              {"service": "http://localhost:8081/log", "type": "webService", "webType": "producer"}]
             }
         )
         self.catalogURL = "http://localhost"

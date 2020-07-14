@@ -46,8 +46,8 @@ class IoTDevice():
             {
 	            "deviceID": "pir",
 	            "endPoints": [
-                    {"service": "localhost:8080/thereIsPerson","type": "webService"},
-                    {"service":"localhost:8080/nonloso","type":"webService"}
+                    {"service": "localhost:8080/thereIsPerson", "type": "webService", "webType": "producer"},
+                    {"service":"localhost:8080/nonloso", "type":"webService", "webType": "consumer"}
 		        ],
 		        "availableResources": ["person"]
             }

@@ -27,7 +27,8 @@ class IoTDevice():
                 print("Registering to the catalog...")
                 try:
                     response = requests.put(self.catalogURL, data = self.payload)
-                except (ConnectionError, requests.HTTPError, requests.Timeout):
+                    response.raise_for_status()
+                except:
                     print("An error occurred while performing the request to the device catalog.")
                 else:
                     print("Registration successful, got " + response.text)
@@ -47,9 +48,9 @@ class IoTDevice():
 	            "deviceID": "pir",
 	            "endPoints": [
                     {"service": "localhost:8080/thereIsPerson", "type": "webService", "webType": "producer"},
-                    {"service":"localhost:8080/nonloso", "type":"webService", "webType": "consumer"}
+                    {"service": "localhost:8080/nonloso", "type":"webService", "webType": "consumer"}
 		        ],
-		        "availableResources": ["person"]
+		        "resources": ["person", "nonloso"]
             }
         )
         print(self.payload)
@@ -59,18 +60,13 @@ class IoTDevice():
 
  
     def GET(self, *uri, **params):
-        if len(uri) != 1:
-            # Whathever the uri was, it's not valid
-            # Set the appropriate HTTP status
-            cherrypy.response.status = 404 # Not Found
-            return "Command not supported!"
-
         # Shutdown on "shutdown". Used for debugging purposes
-        if uri[0] == "shutdown":
+        if len(uri) == 1 and uri[0] == "shutdown":
             cherrypy.engine.exit()
             return ""
     
-
+        cherrypy.response.status = 404 # Not Found
+        return "Command not supported!"
 
 if __name__ == "__main__":
     conf = {
@@ -82,7 +78,7 @@ if __name__ == "__main__":
 
     cherrypy.tree.mount(IoTDevice(), "/", conf)
     cherrypy.config.update({"server.socket_host": "0.0.0.0"})
-    cherrypy.config.update({'server.socket_port': 8081}) # Change the port to run it simultaneously with the catalog on the same machine
+    cherrypy.config.update({'server.socket_port': 8082}) # Change the port to run it simultaneously with the catalog on the same machine
 
     cherrypy.engine.start()
     cherrypy.engine.block()

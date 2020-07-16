@@ -24,9 +24,9 @@ def endPointToMenuButton(endPoint) -> str:
         res += "MQTT"
 
         if endPoint["mqttClientType"] == "subscriber":
-            res += "sub: "
+            res += " sub: "
         else:
-            res += "pub: "
+            res += " pub: "
     
     return res + endPoint["service"]
 
@@ -76,6 +76,21 @@ class TelegramBot:
         self.botDispatcher.add_handler(ext.CommandHandler(command = "start", callback = self.botClbStart))
         self.botDispatcher.add_handler(ext.CallbackQueryHandler(self.botClbQueryHandler))
 
+        # Initialize MQTT
+        self.mqttReceivedValues = {} # Store, for every device/service that produces mqtt messages, a list of values (the most recent 64), so that we can then
+                                     # produce a nice chart of that data and send it as a Telegram image.
+                                     # The only drawback is that we must assume a common syntax for every mqtt resource, and that will be SenML.
+        self.mqttReceivedValuesThreshold = 64 # Keep only the newest 64 values and discard the rest
+        
+        self.mqttClient = PahoMQTT.Client("tiot19_Catalog_Telegram_Bot", True)
+        self.mqttClient.on_message = self.mqttOnMessage
+
+        try:
+            self.mqttClient.connect(self.brokerHOST, self.brokerPORT)
+            self.mqttClient.loop_start()
+        except:
+            raise ConnectionError("Unable to connect to the MQTT message broker")
+
         print("LOG: Telegram Bot initialization END")
 
     def start(self):
@@ -106,7 +121,7 @@ class TelegramBot:
     
     def retrieveRegistrations(self):
         # This piece of code will be executed by two distinct threads -> it must be synchronized
-        # (if another thread is already executing this code, just wait for its completion and not do it again)
+        # (if another thread is already executing this code, just wait for its completion and don't do it again)
         if not self.retrieveRegistrationsLock.acquire(blocking = False):
             # Wait until the owner of the lock is done and then return
             self.retrieveRegistrationsLock.acquire(blocking = True)
@@ -131,18 +146,76 @@ class TelegramBot:
             print("LOG: updating available services and devices")
             
             # Update self.availableServices and self.availableDevices
-            self.availableServices = {}
-            self.availableDevices = {}
+            availableServicesNew = {}
+            availableDevicesNew = {}
             
             for s in availableServicesList:
-                print("Adding " + s["serviceID"])
                 del s["timestamp"]
-                self.availableServices[s["serviceID"]] = s
+                availableServicesNew[s["serviceID"]] = s
 
             for d in availableDevicesList:
-                print("Adding " + d["deviceID"])
                 del d["timestamp"]
-                self.availableDevices[d["deviceID"]] = d
+                availableDevicesNew[d["deviceID"]] = d
+
+            # Now we must compare available***New with self.available*** to check for differences, i.e. new devices/services that we must track,
+            # or disconnected devices/services whose data we must delete
+
+            # Check for new instances
+            for s in availableServicesNew.keys():
+                if s not in self.availableServices:
+                    print("Adding service '" + s + "'")
+                    
+                    # Check if it has mqtt publisher end points
+                    for e in availableServicesNew[s]["endPoints"]:
+                        if e["type"] == "mqttTopic" and e["mqttClientType"] == "publisher":
+                            if e["service"] not in self.mqttReceivedValues:
+                                # Subscribe to this topic
+                                self.mqttReceivedValues[e["service"]] = {"amt": 1, "values": []} # amt: "amount" -> how many different devices/services
+                                                                                                 # publish on that topic
+                                self.mqttClient.subscribe(e["service"], 2)
+                            else:
+                                self.mqttReceiveValues[e["service"]]["amt"] += 1
+            
+            for d in availableDevicesNew.keys():
+                if d not in self.availableDevices:
+                    print("Adding device '" + d + "'")
+                    
+                    for e in availableDevicesNew[d]["endPoints"]:
+                        if e["type"] == "mqttTopic" and e["mqttClientType"] == "publisher":
+                            if e["service"] not in self.mqttReceivedValues:
+                                self.mqttReceivedValues[e["service"]] = {"amt": 1, "values": []}
+                                self.mqttClient.subscribe(e["service"], 2)
+                            else:
+                                self.mqttReceiveValues[e["service"]]["amt"] += 1
+
+            # Check for disconnected instances
+            for s in self.availableServices.keys():
+                if s not in availableServicesNew:
+                    print("Removing service '" + s + "'")
+                    
+                    for e in self.availableServices[s]["endPoints"]:
+                        if e["type"] == "mqttTopic" and e["mqttClientType"] == "publisher":
+                            self.mqttReceivedValues[e["service"]]["amt"] -= 1
+                            
+                            if self.mqttReceivedValues[e["service"]]["amt"] == 0:
+                                self.mqttClient.unsubscribe(e["service"])
+                                del self.mqttReceivedValues[e["service"]]
+
+            for d in self.availableDevices.keys():
+                if d not in availableDevicesNew:
+                    print("Removing device '" + d + "'")
+                    
+                    for e in self.availableDevices[d]["endPoints"]:
+                        if e["type"] == "mqttTopic" and e["mqttClientType"] == "publisher":
+                            self.mqttReceivedValues[e["service"]]["amt"] -= 1
+
+                            if self.mqttReceivedValues[e["service"]]["amt"] == 0:
+                                self.mqttClient.unsubscribe(e["service"])
+                                del self.mqttReceivedValues[e["service"]]
+
+            # Finally, swap the dicts
+            self.availableServices = availableServicesNew
+            self.availableDevices = availableDevicesNew
 
             print("LOG: update complete")
             
@@ -168,7 +241,17 @@ class TelegramBot:
 
     def botMainMenu(self, update: telegram.Update, context: ext.CallbackContext):
         # Send the list of available devices and services as a button menu
-        self.retrieveRegistrations()
+        try:
+            if not self.catalogAvailable:
+                raise Exception()
+
+            self.retrieveRegistrations()
+        except:
+            print("ERROR: in botMainMenu -> retrieveRegistrations failed, it seems that the catalog is not really available")
+            context.bot.send_message(chat_id = update.effective_chat.id, text = "Ooops!\n\nIt seems that the catalog is not available. Please try again later.")
+
+            return
+            
         message = "Choose one of the available devices or services"
         context.bot.send_message(chat_id = update.effective_chat.id, text = message)
 
@@ -260,6 +343,15 @@ class TelegramBot:
             context.bot.send_message(chat_id = update.effective_chat.id, text = "No end point available", reply_markup = telegram.InlineKeyboardMarkup(menu))
         else:
             context.bot.send_message(chat_id = update.effective_chat.id, text = "Available end points:", reply_markup = telegram.InlineKeyboardMarkup(menu))
+    
+    def mqttOnMessage(self, client, userdata, message):
+        self.mqttReceivedValues[message.topic]["values"].append(message.payload.decode())
+        
+        # Remove any message that exceeds the predefined threshold (from the oldest)
+        if len(self.mqttReceivedValues[message.topic]["values"]) > self.mqttReceivedValuesThreshold:
+            self.mqttReceivedValues[message.topic]["values"].pop(0)
+        
+        print("Received message number " + str(len(self.mqttReceivedValues[message.topic]["values"])) + " in topic " + message.topic)
 
 if __name__ == "__main__":
     bot = TelegramBot("http://localhost", 8080, "1229244529:AAGhUR_oqvcp-nToD4yPwhOk7NM_o57qbLQ")

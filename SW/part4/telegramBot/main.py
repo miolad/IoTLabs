@@ -6,29 +6,69 @@ import paho.mqtt.client as PahoMQTT
 import telegram.ext as ext
 import telegram
 import matplotlib.pyplot as plt
+import io
 
 # Takes an end point as a python dict and produces its string representation for displaying as a telegram menu button.
 # Assumes the end point is valid
 def endPointToMenuButton(endPoint) -> str:
     res = ""
 
-    if endPoint["type"] == "webService":
-        res += "HTTP"
-        
-        if endPoint["webType"] == "producer":
-            res += " prod: "
-        else:
-            res += " cons: "
-        
-    else:
-        res += "MQTT"
+    try:
+        if endPoint["type"] == "webService":
+            res += "HTTP"
+            
+            if endPoint["webType"] == "producer":
+                res += " prod: "
+            elif endPoint["webType"] == "consumer":
+                res += " cons: "
+            else:
+                raise Exception()
+            
+        elif endPoint["type"] == "mqttTopic":
+            res += "MQTT"
 
-        if endPoint["mqttClientType"] == "subscriber":
-            res += " sub: "
-        else:
-            res += " pub: "
+            if endPoint["mqttClientType"] == "subscriber":
+                res += " sub: "
+            elif endPoint["mqttClientType"] == "publisher":
+                res += " pub: "
+            else:
+                raise Exception()
+        
+        res = res + endPoint["service"]
+    except:
+        res = "INVALID ENDPOINT"
     
-    return res + endPoint["service"]
+    return res
+
+def endPointToCallbackData(endPoint) -> str:
+    cbd = "e_"
+
+    try:
+        if endPoint["type"] == "webService":
+            cbd += "w"
+            
+            if endPoint["webType"] == "producer":
+                cbd += "p"
+            elif endPoint["webType"] == "consumer":
+                cbd += "c"
+            else:
+                raise Exception()
+            
+        elif endPoint["type"] == "mqttTopic":
+            cbd += "m"
+
+            if endPoint["mqttClientType"] == "subscriber":
+                cbd += "s"
+            elif endPoint["mqttClientType"] == "publisher":
+                cbd += "p"
+            else:
+                raise Exception()
+        
+        cbd += "_" + endPoint["service"]
+    except:
+        cbd = ""
+
+    return cbd
 
 class TelegramBot:
     def __init__(self, catalogHOST: str, catalogPORT: int, botToken: str):
@@ -303,6 +343,9 @@ class TelegramBot:
             # Go to main menu
             self.botMainMenu(update, context)
 
+        elif data[0:1] == "e":
+            self.botHandleEndPointRequest(update, context, data[2:])
+
         # Else it's an invalid request, ignore it
     
     def botHandleServiceRequest(self, update: telegram.Update, context: ext.CallbackContext, serviceID: str):
@@ -313,9 +356,9 @@ class TelegramBot:
 
         # Produce list of end points
         menu = []
-        for (i, e) in enumerate(self.availableServices[serviceID]["endPoints"]):
+        for e in self.availableServices[serviceID]["endPoints"]:
             # Telegram API has a nasty 64 byte limitation on the callback_data, so I had to get creative
-            menu.append([telegram.InlineKeyboardButton(endPointToMenuButton(e), callback_data = "e_s_" + serviceID + "_" + str(i))])
+            menu.append([telegram.InlineKeyboardButton(endPointToMenuButton(e), callback_data = endPointToCallbackData(e))])
         
         # Append 'go back' button
         menu.append([telegram.InlineKeyboardButton("Go Back", callback_data = "m")])
@@ -333,8 +376,8 @@ class TelegramBot:
 
         # Produce list of end points
         menu = []
-        for (i, e) in enumerate(self.availableDevices[deviceID]["endPoints"]):
-            menu.append([telegram.InlineKeyboardButton(endPointToMenuButton(e), callback_data = "e_d_" + deviceID + str(i))])
+        for e in self.availableDevices[deviceID]["endPoints"]:
+            menu.append([telegram.InlineKeyboardButton(endPointToMenuButton(e), callback_data = endPointToCallbackData(e))])
         
         # Append 'go back' button
         menu.append([telegram.InlineKeyboardButton("Go Back", callback_data = "m")])
@@ -344,14 +387,48 @@ class TelegramBot:
         else:
             context.bot.send_message(chat_id = update.effective_chat.id, text = "Available end points:", reply_markup = telegram.InlineKeyboardMarkup(menu))
     
+    def botHandleEndPointRequest(self, update: telegram.Update, context: ext.CallbackContext, endPointID: str):
+        print("Handling end point request for " + endPointID)
+        endPoint = endPointID[3:]
+
+        # MQTT publisher
+        if endPointID[0:2] == "mp":
+            print("End point is MQTT publisher")
+            context.bot.send_message(chat_id = update.effective_chat.id, text = "I collected " + str(len(self.mqttReceivedValues[endPoint]["values"])) + " for resource '" + endPoint + "'")
+
+            if len(self.mqttReceivedValues[endPoint]["values"]) > 0:
+                # Get the list of values
+                values = []
+                for v in self.mqttReceivedValues[endPoint]["values"]:
+                    for e in v["e"]:
+                        values.append(e["v"])
+                
+                # Generate the chart
+                plt.plot(values)
+                plt.ylabel(endPoint + " [" + self.mqttReceivedValues[endPoint]["values"][0]["e"][0]["u"] + "]")
+                plt.title("Latest " + str(len(values)) + " value(s) for " + endPoint + ".")
+
+                # Save the image in a buffer
+                buf = io.BytesIO()
+                plt.savefig(fname = buf, format = "png", dpi = 200)
+                buf.seek(0)
+                data = buf.read()
+                buf.close()
+                f = open("tmp.png", "wb")
+                f.write(data)
+                f.close()
+
+                # Send the image via Telegram
+                context.bot.send_photo(chat_id = update.effective_chat.id, photo = open("tmp.png", "rb"))
+    
     def mqttOnMessage(self, client, userdata, message):
-        self.mqttReceivedValues[message.topic]["values"].append(message.payload.decode())
+        # print("Received message number " + str(len(self.mqttReceivedValues[message.topic]["values"])) + " in topic " + message.topic)
+        
+        self.mqttReceivedValues[message.topic]["values"].append(json.loads(message.payload.decode()))
         
         # Remove any message that exceeds the predefined threshold (from the oldest)
         if len(self.mqttReceivedValues[message.topic]["values"]) > self.mqttReceivedValuesThreshold:
             self.mqttReceivedValues[message.topic]["values"].pop(0)
-        
-        print("Received message number " + str(len(self.mqttReceivedValues[message.topic]["values"])) + " in topic " + message.topic)
 
 if __name__ == "__main__":
     bot = TelegramBot("http://localhost", 8080, "1229244529:AAGhUR_oqvcp-nToD4yPwhOk7NM_o57qbLQ")

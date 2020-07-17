@@ -393,33 +393,48 @@ class TelegramBot:
 
         # MQTT publisher
         if endPointID[0:2] == "mp":
-            print("End point is MQTT publisher")
             context.bot.send_message(chat_id = update.effective_chat.id, text = "I collected " + str(len(self.mqttReceivedValues[endPoint]["values"])) + " for resource '" + endPoint + "'")
 
-            if len(self.mqttReceivedValues[endPoint]["values"]) > 0:
+            if len(self.mqttReceivedValues[endPoint]["values"]) > 1:
                 # Get the list of values
                 values = []
+                times = []
+                eventBased = False
+                
                 for v in self.mqttReceivedValues[endPoint]["values"]:
                     for e in v["e"]:
-                        values.append(e["v"])
-                
+                        times.append(e["t"])
+                        
+                        # Need to differentiate between resources with values (i.e. temperature) and event-based resources (i.e. sound or pir)
+                        if e["v"] != None and e["u"] != None:
+                            values.append(e["v"])
+                        else:
+                            values.append(1)
+                            eventBased = True
+                    
                 # Generate the chart
-                plt.plot(values)
-                plt.ylabel(endPoint + " [" + self.mqttReceivedValues[endPoint]["values"][0]["e"][0]["u"] + "]")
+                if eventBased:
+                    plt.plot(times, values, "x")
+                    unit = ""
+                    plt.yticks([0, 1, 2], ["", "ON", ""])
+                else:
+                    plt.plot(times, values)
+                    unit = " [" + self.mqttReceivedValues[endPoint]["values"][0]["e"][0]["u"] + "]"
+
+                plt.ylabel(endPoint + unit)
+                plt.xlabel("time [s]")
                 plt.title("Latest " + str(len(values)) + " value(s) for " + endPoint + ".")
 
                 # Save the image in a buffer
                 buf = io.BytesIO()
-                plt.savefig(fname = buf, format = "png", dpi = 200)
+                plt.savefig(fname = buf, format = "png", dpi = 200, bbox_inches = "tight")
+                plt.close()
                 buf.seek(0)
-                data = buf.read()
-                buf.close()
-                f = open("tmp.png", "wb")
-                f.write(data)
-                f.close()
 
                 # Send the image via Telegram
-                context.bot.send_photo(chat_id = update.effective_chat.id, photo = open("tmp.png", "rb"))
+                # context.bot.send_photo(chat_id = update.effective_chat.id, photo = open("tmp.png", "rb"))
+                context.bot.send_photo(chat_id = update.effective_chat.id, photo = buf)
+                buf.close()
     
     def mqttOnMessage(self, client, userdata, message):
         # print("Received message number " + str(len(self.mqttReceivedValues[message.topic]["values"])) + " in topic " + message.topic)

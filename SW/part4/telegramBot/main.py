@@ -115,12 +115,15 @@ class TelegramBot:
         self.botDispatcher = self.botUpdater.dispatcher
         self.botDispatcher.add_handler(ext.CommandHandler(command = "start", callback = self.botClbStart))
         self.botDispatcher.add_handler(ext.CallbackQueryHandler(self.botClbQueryHandler))
+        self.botDispatcher.add_handler(ext.MessageHandler(ext.Filters.text, self.botMessageHandler))
 
         # Initialize MQTT
         self.mqttReceivedValues = {} # Store, for every device/service that produces mqtt messages, a list of values (the most recent 64), so that we can then
                                      # produce a nice chart of that data and send it as a Telegram image.
                                      # The only drawback is that we must assume a common syntax for every mqtt resource, and that will be SenML.
         self.mqttReceivedValuesThreshold = 64 # Keep only the newest 64 values and discard the rest
+
+        self.pendingAlerts = {} # For pending inputs of alert thresholds
         
         self.mqttClient = PahoMQTT.Client("tiot19_Catalog_Telegram_Bot", True)
         self.mqttClient.on_message = self.mqttOnMessage
@@ -210,8 +213,8 @@ class TelegramBot:
                         if e["type"] == "mqttTopic" and e["mqttClientType"] == "publisher":
                             if e["service"] not in self.mqttReceivedValues:
                                 # Subscribe to this topic
-                                self.mqttReceivedValues[e["service"]] = {"amt": 1, "values": []} # amt: "amount" -> how many different devices/services
-                                                                                                 # publish on that topic
+                                self.mqttReceivedValues[e["service"]] = {"amt": 1, "values": [], "alerts": {}} # amt: "amount" -> how many different devices/services
+                                                                                                               # publish on that topic
                                 self.mqttClient.subscribe(e["service"], 2)
                             else:
                                 self.mqttReceiveValues[e["service"]]["amt"] += 1
@@ -223,7 +226,7 @@ class TelegramBot:
                     for e in availableDevicesNew[d]["endPoints"]:
                         if e["type"] == "mqttTopic" and e["mqttClientType"] == "publisher":
                             if e["service"] not in self.mqttReceivedValues:
-                                self.mqttReceivedValues[e["service"]] = {"amt": 1, "values": []}
+                                self.mqttReceivedValues[e["service"]] = {"amt": 1, "values": [], "alerts": {}}
                                 self.mqttClient.subscribe(e["service"], 2)
                             else:
                                 self.mqttReceiveValues[e["service"]]["amt"] += 1
@@ -270,7 +273,7 @@ class TelegramBot:
         
         # Send introductory message
         if not self.catalogAvailable:
-            message = "Hi, currently the catalog is not available"
+            message = "Hi, the catalog is currently not available"
         else:
             message = "Hi, currently connected to the catalog at " + self.catalogEndPoint
         
@@ -281,6 +284,8 @@ class TelegramBot:
 
     def botMainMenu(self, update: telegram.Update, context: ext.CallbackContext):
         # Send the list of available devices and services as a button menu
+        msg = context.bot.send_message(chat_id = update.effective_chat.id, text = "Fetching data...")
+        
         try:
             if not self.catalogAvailable:
                 raise Exception()
@@ -288,12 +293,18 @@ class TelegramBot:
             self.retrieveRegistrations()
         except:
             print("ERROR: in botMainMenu -> retrieveRegistrations failed, it seems that the catalog is not really available")
-            context.bot.send_message(chat_id = update.effective_chat.id, text = "Ooops!\n\nIt seems that the catalog is not available. Please try again later.")
+            # context.bot.send_message(chat_id = update.effective_chat.id, text = "Ooops!\n\nIt seems that the catalog is not available. Please try again later.")
+            context.bot.edit_message_text(chat_id = update.effective_chat.id,
+                                          message_id = msg.message_id,
+                                          text = "Ooops!\n\nIt seems that the catalog is not available. Please try again later.")
 
             return
             
         message = "Choose one of the available devices or services"
-        context.bot.send_message(chat_id = update.effective_chat.id, text = message)
+        # context.bot.send_message(chat_id = update.effective_chat.id, text = message)
+        context.bot.edit_message_text(chat_id = update.effective_chat.id,
+                                      message_id = msg.message_id,
+                                      text = message)
 
         # Build the menu
         # Services
@@ -339,12 +350,24 @@ class TelegramBot:
 
             self.botHandleDeviceRequest(update, context, data[2:])
         
+        # Main menu
         elif data[0:1] == "m":
             # Go to main menu
             self.botMainMenu(update, context)
 
+        # End points
         elif data[0:1] == "e":
             self.botHandleEndPointRequest(update, context, data[2:])
+
+        # Alerts
+        elif data[0:1] == "a":
+            # Add or remove alert?
+            if data[1:2] == "a":
+                # Add
+                self.botAddAlert(update, context, data[3:])
+            elif data[1:2] == "r":
+                # Remove
+                self.botRemoveAlert(update, context, data[3:])
 
         # Else it's an invalid request, ignore it
     
@@ -393,7 +416,20 @@ class TelegramBot:
 
         # MQTT publisher
         if endPointID[0:2] == "mp":
-            context.bot.send_message(chat_id = update.effective_chat.id, text = "I collected " + str(len(self.mqttReceivedValues[endPoint]["values"])) + " for resource '" + endPoint + "'")
+            if endPoint not in self.mqttReceivedValues:
+                return
+            
+            # Build the button to allow the user to (un)subscribe to alerts for this resource
+            if update.effective_chat.id in self.mqttReceivedValues[endPoint]["alerts"]:
+                button = telegram.InlineKeyboardButton("Remove alert for " + endPoint, callback_data = "ar_" + endPoint)
+            else:
+                button = telegram.InlineKeyboardButton("Add alert for " + endPointID, callback_data = "aa_" + endPoint)
+            
+            menu = [[button]]
+            
+            context.bot.send_message(chat_id = update.effective_chat.id,
+                                     text = "I collected " + str(len(self.mqttReceivedValues[endPoint]["values"])) + " value(s) for resource '" + endPoint + "'",
+                                     reply_markup = telegram.InlineKeyboardMarkup(menu))
 
             if len(self.mqttReceivedValues[endPoint]["values"]) > 1:
                 # Get the list of values
@@ -436,14 +472,62 @@ class TelegramBot:
                 context.bot.send_photo(chat_id = update.effective_chat.id, photo = buf)
                 buf.close()
     
+    def botAddAlert(self, update: telegram.Update, context: ext.CallbackContext, endPoint: str):
+        if endPoint not in self.mqttReceivedValues:
+            return
+
+        # We must ask the user for the threshold to trigger the alert (a numerical value)
+        self.pendingAlerts[update.effective_chat.id] = endPoint
+
+        context.bot.send_message(chat_id = update.effective_chat.id, text = "Please, input the desired threshold for the alert")
+
+    def botRemoveAlert(self, update: telegram.Update, context: ext.CallbackContext, endPoint: str):
+        if endPoint in self.mqttReceivedValues and update.effective_chat.id in self.mqttReceivedValues[endPoint]["alerts"]:
+            del self.mqttReceivedValues[endPoint]["alerts"][update.effective_chat.id]
+
+            context.bot.send_message(chat_id = update.effective_chat.id, text = "Correctly removed alert for resource " + endPoint)
+    
+    def botMessageHandler(self, update: telegram.Update, context: ext.CallbackContext):
+        if update.effective_chat.id not in self.pendingAlerts or self.pendingAlerts[update.effective_chat.id] not in self.mqttReceivedValues:
+            return
+
+        # Try to parse the text as a number
+        try:
+            alertThreshold = float(update.message.text)
+        except:
+            context.bot.send_message(chat_id = update.effective_chat.id, text = "Invalid threshold. Please input a numerical value.")
+            return
+
+        self.mqttReceivedValues[self.pendingAlerts[update.effective_chat.id]]["alerts"][update.effective_chat.id] = alertThreshold
+        del self.pendingAlerts[update.effective_chat.id]
+
+        context.bot.send_message(chat_id = update.effective_chat.id, text = "Alert correctly configured.")
+    
     def mqttOnMessage(self, client, userdata, message):
         # print("Received message number " + str(len(self.mqttReceivedValues[message.topic]["values"])) + " in topic " + message.topic)
         
-        self.mqttReceivedValues[message.topic]["values"].append(json.loads(message.payload.decode()))
+        try:
+            msg = json.loads(message.payload.decode())
+        except:
+            return
+
+        self.mqttReceivedValues[message.topic]["values"].append(msg)
         
         # Remove any message that exceeds the predefined threshold (from the oldest)
         if len(self.mqttReceivedValues[message.topic]["values"]) > self.mqttReceivedValuesThreshold:
             self.mqttReceivedValues[message.topic]["values"].pop(0)
+
+        # Check for alerts
+        try:
+            for e in msg["e"]:
+                v = float(e["v"])
+                for c, t in self.mqttReceivedValues[message.topic]["alerts"].items():
+                    if v >= t:
+                        # Send alert to chat c
+                        self.botUpdater.bot.send_message(chat_id = c, text = "ALERT: Resource '" + message.topic + "' reported value " + str(v) + " " + e["u"] + \
+                                                                             ", which is higher than the specified threshold of " + str(t) + " " + e["u"])
+        except:
+            pass
 
 if __name__ == "__main__":
     bot = TelegramBot("http://localhost", 8080, "1229244529:AAGhUR_oqvcp-nToD4yPwhOk7NM_o57qbLQ")

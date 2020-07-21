@@ -115,11 +115,13 @@ class RESTCatalog:
                 payload = json.loads(message.payload)
             except:
                 print("MQTT: Received invalid JSON")
+                return
  
             try:
                 d = Device.parseDevice(payload)
             except ValueError as e:
                 print("MQTT: Invalid data in JSON: " + str(e))
+                return
 
             # Add timestamp
             d.timestamp = str(datetime.datetime.now())

@@ -7,6 +7,7 @@
 #define FAN_MODULE_PWM_PIN      9
 #define RED_LED_PIN             6
 #define NOISE_SENSOR_PIN        7
+#define PIR_SENSOR_PIN          10
 
 #define SUBSCRIBE_TO_CATALOG_PERIOD_LENGTH 60000           // ms
 #define SECONDS_LED_PERIOD                 1000000         // us
@@ -115,6 +116,7 @@ void setup()
     pinMode(FAN_MODULE_PWM_PIN, OUTPUT);
     pinMode(NOISE_SENSOR_PIN, INPUT);
     pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(PIR_SENSOR_PIN, INPUT);
 
     // Initially set the fan module to off
     analogWrite(FAN_MODULE_PWM_PIN, 0);
@@ -129,7 +131,7 @@ void setup()
 
     // Setup the lcd display
     lcd.begin(16, 2);
-    lcd.setBacklight(255);
+    lcd.setBacklight(0); // Initially off
     lcd.home();
     lcd.clear();
 
@@ -179,6 +181,10 @@ void loop()
             callbackRan = false;
             mqtt.monitor();
         }
+
+        // Use the pir sensor to determine if the lcd should be on or not
+        // (use the hardware timeout of the pir sensor for a nice and automatic screen on duration)
+        lcd.setBacklight(255 * digitalRead(PIR_SENSOR_PIN));
 
         // Update the display
         int h = timeOfDaySeconds / 3600;

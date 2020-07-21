@@ -210,7 +210,7 @@ class RemoteSmartHomeController(cherrypy.process.plugins.SimplePlugin):
             self.stopThreadEvent.wait(self.mainLoopPeriod) 
 
     def onConnect(self, client, userdata, flags, rc):
-        print("Connected to mqtt broker")
+        print("Connected to the mqtt broker")
 
     def onMessage(self, client, userdata, message):
         # print("Received on topic " + message.topic + ": " + message.payload.decode())
@@ -259,6 +259,7 @@ class RemoteSmartHomeController(cherrypy.process.plugins.SimplePlugin):
         self.running = False
         self.stopThreadEvent.set()
         self.subscribeThread.join()
+        self.mainLoopThread.join()
 
         # Stop the mqtt thread
         self.mqttClient.loop_stop(force = False)
@@ -271,7 +272,8 @@ class RemoteSmartHomeController(cherrypy.process.plugins.SimplePlugin):
             cherrypy.engine.exit()
             return ""
 
-        return "Hey" 
+        cherrypy.response.status = 404 # Not Found
+        return json.dumps({"result": "failure", "reason": "Not Found"})
         
     # Sintax: /changeSetPoint?sp=ac/ht&person=true/false&min=<min>&max=<max>
     def POST(self, *uri, **params):
@@ -306,7 +308,7 @@ if __name__ == "__main__":
     try:
         root = RemoteSmartHomeController("http://localhost", 8080, "Yun", 60)
     except Exception as e:
-        print(str(e))
+        print("ERROR:" + str(e))
         exit(-1)
 
     cherrypy.tree.mount(root, "/", conf)

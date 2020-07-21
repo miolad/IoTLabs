@@ -315,7 +315,7 @@ class TelegramBot:
             
             context.bot.send_message(chat_id = update.effective_chat.id, text = "Services:", reply_markup = telegram.InlineKeyboardMarkup(menu))
         else:
-            context.bot.send_message(chat_id = update.effective_chat.id, text = "No registered service")
+            context.bot.send_message(chat_id = update.effective_chat.id, text = "No registered services")
 
         # Devices
         if len(self.availableDevices) > 0:
@@ -325,7 +325,7 @@ class TelegramBot:
             
             context.bot.send_message(chat_id = update.effective_chat.id, text = "Devices:", reply_markup = telegram.InlineKeyboardMarkup(menu))
         else:
-            context.bot.send_message(chat_id = update.effective_chat.id, text = "No registered device")
+            context.bot.send_message(chat_id = update.effective_chat.id, text = "No registered devices")
     
     def botClbQueryHandler(self, update: telegram.Update, context: ext.CallbackContext):
         data = update.callback_query.data
@@ -459,7 +459,7 @@ class TelegramBot:
 
                 plt.ylabel(endPoint + unit)
                 plt.xlabel("time [s]")
-                plt.title("Latest " + str(len(values)) + " value(s) for " + endPoint + ".")
+                plt.title("Latest " + str(len(values)) + " values for " + endPoint + ".")
 
                 # Save the image in a buffer
                 buf = io.BytesIO()

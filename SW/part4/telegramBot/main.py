@@ -530,5 +530,6 @@ class TelegramBot:
             pass
 
 if __name__ == "__main__":
+    # The token has been revoked. Shouldn't have published it on Github, I guess.
     bot = TelegramBot("http://localhost", 8080, "1229244529:AAGhUR_oqvcp-nToD4yPwhOk7NM_o57qbLQ")
     bot.start()

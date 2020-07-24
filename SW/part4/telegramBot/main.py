@@ -273,7 +273,7 @@ class TelegramBot:
         
         # Send introductory message
         if not self.catalogAvailable:
-            message = "Hi, the catalog is currently not available"
+            message = "Hi, the catalog is currently unavailable"
         else:
             message = "Hi, currently connected to the catalog at " + self.catalogEndPoint
         
@@ -423,7 +423,7 @@ class TelegramBot:
             if update.effective_chat.id in self.mqttReceivedValues[endPoint]["alerts"]:
                 button = telegram.InlineKeyboardButton("Remove alert for " + endPoint, callback_data = "ar_" + endPoint)
             else:
-                button = telegram.InlineKeyboardButton("Add alert for " + endPointID, callback_data = "aa_" + endPoint)
+                button = telegram.InlineKeyboardButton("Add alert for " + endPoint, callback_data = "aa_" + endPoint)
             
             menu = [[button]]
             

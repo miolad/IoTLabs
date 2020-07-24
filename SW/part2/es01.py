@@ -116,6 +116,7 @@ class RESTCatalog():
         except:
             # Could not open the file -> log the error
             print("ERROR: Couldn't open the file " + self.JSONFile + " for writing")
+            return
 
         try:
             jsonFile.write(json.dumps(self.database, default=self.customSerializer))

@@ -130,7 +130,7 @@ if __name__ == "__main__":
     try:
         ledController = MQTTLedController("http://localhost", 8080, "Yun", 60)
     except Exception as e:
-        print(str(e))
+        print("ERROR: " + str(e))
         exit(-1)
 
     ledController.run("q")

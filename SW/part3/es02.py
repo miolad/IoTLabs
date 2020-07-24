@@ -81,14 +81,17 @@ class MQTTTemperatureReceiver:
             })
 
     def onConnect(self, client, userdata, flags, rc):
-        print("Connected to mqtt broker")
+        if rc == 0:
+            print("Successfully connected to the MQTT broker")
+        else:
+            print("Connection to MQTT broker failed: rc = " + str(rc))
 
     def onMessage(self, client, userdata, message):
         print(message.payload.decode())
 
     def run(self, characterToExit: str):
         self.subscribeThread.start()
-        print("Waiting for messages [press " + characterToExit + " to exit]")
+        print("Waiting for messages [press [" + characterToExit + "] to exit]")
         
         while True:
             c = input()
@@ -120,7 +123,7 @@ if __name__ == "__main__":
     try:
         temperatureReceiver = MQTTTemperatureReceiver("http://localhost", 8080, "Yun", 60)
     except Exception as e:
-        print(str(e))
+        print("ERROR: " + str(e))
         exit(-1)
 
     temperatureReceiver.run("q")

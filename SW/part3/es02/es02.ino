@@ -20,7 +20,6 @@
 #define SUBSCRIBE_TO_CATALOG_PERIOD_LENGTH 60000    // ms
 
 #define DEVICE_SUBSCRIPTION_JSON_STRING     F("{\"deviceID\": \"Yun\", \"resources\": [\"temperature\", \"led\"], \"endPoints\": [{\"service\": \"/tiot/19/temperature\", \"type\": \"mqttTopic\", \"mqttClientType\": \"publisher\"}, {\"service\": \"/tiot/19/led\", \"type\": \"mqttTopic\", \"mqttClientType\": \"subscriber\"}]}")
-#define CATALOG_END_POINT                   F("http://192.168.1.37:8080/addDevice")
 
 const char BASE_TOPIC[] = "/tiot/19/";
 

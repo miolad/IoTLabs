@@ -155,7 +155,7 @@ class RemoteSmartHomeController(cherrypy.process.plugins.SimplePlugin):
             if self.lastMessageTimestamp > self.timeOfLastPirEvent + self.timeoutPir:
                 self.person["pir"] = False
 
-            # Max could raise ValueError if the iterable is empty
+            # Max will raise ValueError if the iterable is empty
             try:
                 if self.lastMessageTimestamp > max(self.soundEvents) + self.timeoutSound:
                     self.person["sound"] = False
@@ -210,7 +210,10 @@ class RemoteSmartHomeController(cherrypy.process.plugins.SimplePlugin):
             self.stopThreadEvent.wait(self.mainLoopPeriod) 
 
     def onConnect(self, client, userdata, flags, rc):
-        print("Connected to the mqtt broker")
+        if rc == 0:
+            print("Successfully connected to the MQTT broker")
+        else:
+            print("Connection to MQTT broker failed: rc = " + str(rc))
 
     def onMessage(self, client, userdata, message):
         # print("Received on topic " + message.topic + ": " + message.payload.decode())

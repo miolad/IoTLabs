@@ -13,8 +13,7 @@ void pirSensorCallback()
     digitalWrite(LED_PIN, pin);
 
     // Increment the counter if the pin is rising
-    if (pin)
-        ++totCount;
+    totCount += pin;
 }
 
 void setup()

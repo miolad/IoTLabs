@@ -9,7 +9,7 @@
 #define ONE_OVER_T0 1.f / (25.0 + 273.15)           // K
 #define CELSIUS_OFFSET 273.15                       // K
 
-#define MAIN_PERIOD_LENGTH 2500                           // ms
+#define MAIN_PERIOD_LENGTH 2500                     // ms
 
 // -------------- VARIABLES --------------
 

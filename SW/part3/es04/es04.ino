@@ -225,7 +225,8 @@ void loop()
         forceSensorLoop = false;
 
         // Every time mqtt.monitor() is called, only one message for every topic can be processed
-        // With this method, mqtt.monitor() is only called one extra time to ensure that it is still called enough times to process every message
+        // With this method, mqtt.monitor() is only called one extra time to ensure that it is
+        // still called enough times to process every message
         callbackRan = true;
         while (callbackRan)
         {
